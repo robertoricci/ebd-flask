@@ -11,11 +11,11 @@ services:
         generateValue: true
       - key: DATABASE_URL
         fromDatabase:
-          name: ebd-postgres
+          name: ebd_postgres
           property: connectionString
 
 databases:
   - name: ebd-postgres
-    databaseName: ebd_db
-    user: ebd_user
+    databaseName: ebd_postgres
+    user: ebd_postgres_user
     plan: free
