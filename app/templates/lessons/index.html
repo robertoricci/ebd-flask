@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Aulas – EBD{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Aulas</h2><p>Gerencie as aulas cadastradas</p></div>
+<div class="toolbar">
+  <form method="GET" class="search-wrap">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" name="q" placeholder="Buscar aula..." value="{{ search }}">
+  </form>
+  <button class="btn btn-primary" onclick="openModal('createModal')">+ Nova Aula</button>
+</div>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Título</th><th>Data</th><th>Turma</th><th>Status</th><th>Presença</th><th>Oferta</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for l in lessons %}
+        {% set att_all = l.attendances.count() %}
+        {% set att_present = l.attendances.filter_by(present=True).count() %}
+        {% set pct = ((att_present / att_all * 100) | round(0) | int) if att_all > 0 else 0 %}
+        <tr>
+          <td><div style="font-weight:500;">{{ l.title }}</div></td>
+          <td>{{ l.date | fmt_date }}</td>
+          <td><span class="badge badge-blue">{{ l.klass.name }}</span></td>
+          <td><span class="badge {{ l.status | status_badge }}">{{ l.status }}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:.8rem;">{{ att_present }}/{{ att_all }}</span>
+              {% if att_all > 0 %}
+              <div class="progress-bar" style="width:60px;">
+                <div class="progress-fill" style="width:{{ pct }}%;background:{{ pct | pct_color }};"></div>
+              </div>
+              <span style="font-size:.75rem;color:var(--muted);">{{ pct }}%</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>{{ l.offering | fmt_currency }}</td>
+          <td style="display:flex;gap:4px;">
+            <form method="POST" action="{{ url_for('lessons.advance', id=l.id) }}"><button class="btn btn-success btn-sm" title="Avançar status">↑</button></form>
+            <form method="POST" action="{{ url_for('lessons.retreat', id=l.id) }}"><button class="btn btn-secondary btn-sm" title="Retroceder">↓</button></form>
+            <button class="btn btn-secondary btn-sm" onclick="openEdit({{ l.id }}, '{{ l.title }}', '{{ l.date }}', {{ l.class_id }}, {{ l.trimester_id or 'null' }}, `{{ l.description or '' }}`, {{ l.offering }})">✏️</button>
+            <form method="POST" action="{{ url_for('lessons.delete', id=l.id) }}" onsubmit="return confirm('Remover?')">
+              <button class="btn btn-danger btn-sm">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">Nenhuma aula encontrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+    <h3>Nova Aula</h3>
+    <form method="POST" action="{{ url_for('lessons.create') }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="grid-column:1/-1"><label>Título *</label><input name="title" required></div>
+        <div class="form-group"><label>Data *</label><input type="date" name="date" required></div>
+        <div class="form-group"><label>Turma *</label>
+          <select name="class_id" required>
+            {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label>Trimestre</label>
+          <select name="trimester_id">
+            <option value="">Nenhum</option>
+            {% for t in trimesters %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label>Oferta (R$)</label><input type="number" step="0.01" name="offering" value="0"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Descrição</label><textarea name="description"></textarea></div>
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Criar</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+    <h3>Editar Aula</h3>
+    <form method="POST" id="editForm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="grid-column:1/-1"><label>Título *</label><input name="title" id="eTitle" required></div>
+        <div class="form-group"><label>Data *</label><input type="date" name="date" id="eDate" required></div>
+        <div class="form-group"><label>Turma</label>
+          <select name="class_id" id="eClass">
+            {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label>Trimestre</label>
+          <select name="trimester_id" id="eTrimester">
+            <option value="">Nenhum</option>
+            {% for t in trimesters %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label>Oferta (R$)</label><input type="number" step="0.01" name="offering" id="eOffering"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Descrição</label><textarea name="description" id="eDesc"></textarea></div>
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Salvar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openEdit(id, title, date, classId, trimId, desc, offering) {
+  document.getElementById('editForm').action = `/aulas/${id}/edit`;
+  document.getElementById('eTitle').value = title;
+  document.getElementById('eDate').value = date;
+  document.getElementById('eClass').value = classId;
+  if(trimId) document.getElementById('eTrimester').value = trimId;
+  document.getElementById('eDesc').value = desc;
+  document.getElementById('eOffering').value = offering;
+  openModal('editModal');
+}
+</script>
+{% endblock %}
