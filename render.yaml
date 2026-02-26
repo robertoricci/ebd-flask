@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: ebd-flask
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash render_entrypoint.sh
+    envVars:
+      - key: FLASK_APP
+        value: wsgi.py
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ebd-postgres
+          property: connectionString
+
+databases:
+  - name: ebd-postgres
+    databaseName: ebd_db
+    user: ebd_user
+    plan: free
