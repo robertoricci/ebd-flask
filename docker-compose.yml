@@ -3,7 +3,7 @@ version: '3.9'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ebd_postgres_1
+    container_name: ebd_postgres
     environment:
       POSTGRES_DB: ebd_db
       POSTGRES_USER: ebd_user
@@ -24,7 +24,7 @@ services:
     ports:
       - "5000:5000"
     environment:
-      DATABASE_URL: postgresql://ebd_user:ebd_pass@postgres:5432/ebd_db
+      DATABASE_URL: postgresql+psycopg://ebd_user:ebd_pass@postgres:5432/ebd_db
       SECRET_KEY: super-secret-key-change-in-production
       FLASK_APP: wsgi.py
       FLASK_ENV: production
