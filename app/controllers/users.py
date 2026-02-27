@@ -8,7 +8,6 @@ from app.utils.decorators import admin_required
 users_bp = Blueprint('users', __name__, url_prefix='/usuarios')
 
 def _visible_congregations():
-    """Congregações que o usuário logado pode gerenciar."""
     if current_user.is_superadmin:
         return Congregation.query.order_by(Congregation.name).all()
     if current_user.is_church_admin:
@@ -17,13 +16,19 @@ def _visible_congregations():
         return Congregation.query.filter_by(id=current_user.congregation_id).all()
     return []
 
+def _email_taken(email, congregation_id, exclude_id=None):
+    """Verifica se o email já existe naquela congregação."""
+    q = User.query.filter_by(email=email, congregation_id=congregation_id)
+    if exclude_id:
+        q = q.filter(User.id != exclude_id)
+    return q.first() is not None
+
 @users_bp.route('/')
 @login_required
 @admin_required
 def index():
     search = request.args.get('q', '')
     q = User.query
-    # Filtra por congregações visíveis
     if not current_user.is_superadmin:
         ids = current_user.congregation_filter()
         q = q.filter(User.congregation_id.in_(ids))
@@ -39,18 +44,17 @@ def index():
 @login_required
 @admin_required
 def create():
-    name  = request.form.get('name', '').strip()
-    email = request.form.get('email', '').strip()
+    name     = request.form.get('name', '').strip()
+    email    = request.form.get('email', '').strip().lower()
     password = request.form.get('password', '')
-    role  = request.form.get('role', 'TEACHER')
+    role     = request.form.get('role', 'TEACHER')
     congregation_id = request.form.get('congregation_id', type=int) or None
-    church_id = request.form.get('church_id', type=int) or None
+    church_id       = request.form.get('church_id', type=int) or None
 
-    # Proteção: não-superadmin não pode criar SUPERADMIN ou CHURCH_ADMIN
     if not current_user.is_superadmin and role in ('SUPERADMIN', 'CHURCH_ADMIN'):
         flash('Sem permissão para criar este tipo de usuário.', 'danger')
         return redirect(url_for('users.index'))
-    # Admin de congregação só cria na sua congregação
+
     if current_user.is_congregation_admin:
         congregation_id = current_user.congregation_id
         church_id = None
@@ -58,8 +62,16 @@ def create():
     if not name or not email or not password:
         flash('Nome, email e senha são obrigatórios.', 'danger')
         return redirect(url_for('users.index'))
-    if User.query.filter_by(email=email).first():
-        flash('Email já cadastrado.', 'danger')
+
+    # Validar email único dentro da congregação
+    if congregation_id and _email_taken(email, congregation_id):
+        cong = Congregation.query.get(congregation_id)
+        flash(f'❌ O email "{email}" já está cadastrado na congregação {cong.name if cong else ""}.', 'danger')
+        return redirect(url_for('users.index'))
+
+    # Para SUPERADMIN e CHURCH_ADMIN, email globalmente único (sem congregação)
+    if not congregation_id and User.query.filter_by(email=email).first():
+        flash(f'❌ O email "{email}" já está em uso no sistema.', 'danger')
         return redirect(url_for('users.index'))
 
     u = User(name=name, email=email, role=role,
@@ -75,17 +87,38 @@ def create():
 @admin_required
 def edit(id):
     u = User.query.get_or_404(id)
-    u.name  = request.form.get('name', u.name).strip()
-    u.email = request.form.get('email', u.email).strip()
-    role = request.form.get('role', u.role)
+    new_email = request.form.get('email', u.email).strip().lower()
+    new_name  = request.form.get('name', u.name).strip()
+    role      = request.form.get('role', u.role)
+
+    # Validar email único na congregação (excluindo o próprio usuário)
+    target_cong = u.congregation_id
+    if current_user.is_superadmin:
+        target_cong = request.form.get('congregation_id', type=int) or u.congregation_id
+
+    if new_email != u.email:
+        if target_cong and _email_taken(new_email, target_cong, exclude_id=id):
+            cong = Congregation.query.get(target_cong)
+            flash(f'❌ O email "{new_email}" já está cadastrado na congregação {cong.name if cong else ""}.', 'danger')
+            return redirect(url_for('users.index'))
+        if not target_cong:
+            existing = User.query.filter(User.email == new_email, User.id != id).first()
+            if existing:
+                flash(f'❌ O email "{new_email}" já está em uso no sistema.', 'danger')
+                return redirect(url_for('users.index'))
+
+    u.name  = new_name
+    u.email = new_email
+
     if current_user.is_superadmin:
         u.role = role
         u.congregation_id = request.form.get('congregation_id', type=int) or None
-        u.church_id = request.form.get('church_id', type=int) or None
+        u.church_id       = request.form.get('church_id', type=int) or None
     elif current_user.is_church_admin:
         if role not in ('SUPERADMIN', 'CHURCH_ADMIN'):
             u.role = role
-        u.congregation_id = request.form.get('congregation_id', type=int) or None
+        u.congregation_id = request.form.get('congregation_id', type=int) or u.congregation_id
+
     pw = request.form.get('password', '')
     if pw:
         u.set_password(pw)
@@ -116,7 +149,6 @@ def toggle(id):
 @login_required
 @admin_required
 def congregations_by_church():
-    """AJAX: retorna congregações de uma igreja."""
     church_id = request.args.get('church_id', type=int)
     congs = Congregation.query.filter_by(church_id=church_id).order_by(Congregation.name).all() if church_id else []
     return jsonify([{'id': c.id, 'name': c.name} for c in congs])

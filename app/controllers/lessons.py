@@ -22,17 +22,38 @@ def parse_date(s):
 @login_required
 @admin_required
 def index():
-    search = request.args.get('q', '')
+    search       = request.args.get('q', '').strip()
+    year         = request.args.get('year', type=int)
+    trimester_id = request.args.get('trimester_id', type=int)
+
     q = scoped_lessons()
+
     if search:
         q = q.filter(Lesson.title.ilike(f'%{search}%'))
+    if trimester_id:
+        q = q.filter(Lesson.trimester_id == trimester_id)
+    elif year:
+        t_ids = [t.id for t in Trimester.query.filter_by(year=year).all()]
+        q = q.filter(Lesson.trimester_id.in_(t_ids)) if t_ids else q.filter(db.false())
+
     lessons = q.order_by(Lesson.date.desc()).all()
 
-    # Só turmas e trimestres da congregação do usuário
-    classes    = scoped(Class).order_by(Class.name).all()
-    trimesters = Trimester.query.order_by(Trimester.year.desc()).all()
-    return render_template('lessons/index.html', lessons=lessons, classes=classes,
-                           trimesters=trimesters, search=search)
+    # Anos disponíveis a partir dos trimestres existentes
+    years = [r[0] for r in db.session.query(Trimester.year).distinct().order_by(Trimester.year.desc()).all()]
+
+    # Trimestres filtrados pelo ano selecionado
+    tq = Trimester.query.order_by(Trimester.year.desc(), Trimester.quarter)
+    if year:
+        tq = tq.filter_by(year=year)
+    trimesters = tq.all()
+
+    classes = scoped(Class).order_by(Class.name).all()
+    all_trimesters = Trimester.query.order_by(Trimester.year.desc(), Trimester.quarter).all()
+
+    return render_template('lessons/index.html',
+        lessons=lessons, classes=classes,
+        trimesters=trimesters, all_trimesters=all_trimesters,
+        years=years, year=year, trimester_id=trimester_id, search=search)
 
 @lessons_bp.route('/create', methods=['POST'])
 @login_required

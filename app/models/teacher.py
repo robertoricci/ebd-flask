@@ -10,6 +10,7 @@ class Teacher(db.Model):
     __tablename__ = 'teachers'
 
     id              = db.Column(db.Integer, primary_key=True)
+    user_id         = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True, unique=True)
     name            = db.Column(db.String(150), nullable=False)
     email           = db.Column(db.String(150), nullable=True)
     phone           = db.Column(db.String(30),  nullable=True)
@@ -19,3 +20,4 @@ class Teacher(db.Model):
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
     congregation = db.relationship('Congregation', foreign_keys=[congregation_id], lazy='joined')
+    user         = db.relationship('User', foreign_keys=[user_id], lazy='joined')
