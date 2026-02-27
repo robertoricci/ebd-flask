@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}Professores – EBD{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Professores</h2><p>Gerencie o corpo docente</p></div>
+<div class="toolbar">
+  <form method="GET" class="search-wrap">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" name="q" placeholder="Buscar professor..." value="{{ search }}">
+  </form>
+  <button class="btn btn-primary" onclick="openModal('createModal')">+ Novo Professor</button>
+</div>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Nascimento</th><th>Turmas</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for t in teachers %}
+        <tr>
+          <td><div style="font-weight:500;">{{ t.name }}</div></td>
+          <td style="color:var(--muted);">{{ t.email or '-' }}</td>
+          <td>{{ t.phone or '-' }}</td>
+          <td>{{ t.birth_date | fmt_date }}</td>
+          <td>{{ t.classes | length }}</td>
+          <td style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="openEdit({{ t.id }}, '{{ t.name }}', '{{ t.email or '' }}', '{{ t.phone or '' }}', '{{ t.birth_date.strftime('%Y-%m-%d') if t.birth_date else '' }}', `{{ t.notes or '' }}`)">✏️</button>
+            <form method="POST" action="{{ url_for('teachers.delete', id=t.id) }}" onsubmit="return confirm('Remover?')">
+              <button class="btn btn-danger btn-sm">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;">Nenhum professor cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+    <h3>Novo Professor</h3>
+    <form method="POST" action="{{ url_for('teachers.create') }}">
+      <div class="form-group"><label>Nome *</label><input name="name" required></div>
+      <div class="form-group"><label>Email</label><input type="email" name="email"></div>
+      <div class="form-group"><label>Telefone</label><input name="phone"></div>
+      <div class="form-group"><label>Data de Nascimento</label><input type="date" name="birth_date"></div>
+      <div class="form-group"><label>Observações</label><textarea name="notes"></textarea></div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Criar</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+    <h3>Editar Professor</h3>
+    <form method="POST" id="editForm">
+      <div class="form-group"><label>Nome *</label><input name="name" id="eName" required></div>
+      <div class="form-group"><label>Email</label><input type="email" name="email" id="eEmail"></div>
+      <div class="form-group"><label>Telefone</label><input name="phone" id="ePhone"></div>
+      <div class="form-group"><label>Data de Nascimento</label><input type="date" name="birth_date" id="eBirth"></div>
+      <div class="form-group"><label>Observações</label><textarea name="notes" id="eNotes"></textarea></div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Salvar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openEdit(id, name, email, phone, birth, notes) {
+  document.getElementById('editForm').action = `/professores/${id}/edit`;
+  document.getElementById('eName').value = name;
+  document.getElementById('eEmail').value = email;
+  document.getElementById('ePhone').value = phone;
+  document.getElementById('eBirth').value = birth;
+  document.getElementById('eNotes').value = notes;
+  openModal('editModal');
+}
+</script>
+{% endblock %}

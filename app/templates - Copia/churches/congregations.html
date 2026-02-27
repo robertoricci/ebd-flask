@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Congregações – {{ church.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2>🏛️ Congregações</h2>
+    <p>Igreja: <strong>{{ church.name }}</strong>{% if church.city %} · {{ church.city }}/{{ church.state }}{% endif %}</p>
+  </div>
+  <a href="{{ url_for('churches.index') }}" class="btn btn-secondary">← Voltar</a>
+</div>
+<div class="toolbar">
+  <div></div>
+  <button class="btn btn-primary" onclick="openModal('createModal')">+ Nova Congregação</button>
+</div>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nome</th><th>Cidade</th><th>Endereço</th><th>Status</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for cong in congregations %}
+        <tr>
+          <td><div style="font-weight:600;">{{ cong.name }}</div></td>
+          <td>{{ cong.city or '—' }}</td>
+          <td style="font-size:.8rem;color:var(--muted);">{{ cong.address or '—' }}</td>
+          <td><span class="badge {% if cong.active %}badge-green{% else %}badge-red{% endif %}">{{ 'Ativa' if cong.active else 'Inativa' }}</span></td>
+          <td style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm"
+              onclick="openEdit({{ cong.id }}, '{{ cong.name }}', '{{ cong.city or '' }}', '{{ cong.address or '' }}')">✏️</button>
+            <form method="POST" action="{{ url_for('churches.delete_congregation', id=cong.id) }}" onsubmit="return confirm('Remover congregação?')">
+              <button class="btn btn-danger btn-sm">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px;">Nenhuma congregação cadastrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+    <h3>Nova Congregação</h3>
+    <form method="POST" action="{{ url_for('churches.create_congregation', church_id=church.id) }}">
+      <div class="form-group"><label>Nome *</label><input name="name" required autofocus></div>
+      <div class="form-group"><label>Cidade</label><input name="city"></div>
+      <div class="form-group"><label>Endereço</label><input name="address"></div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Criar</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+    <h3>Editar Congregação</h3>
+    <form method="POST" id="editForm">
+      <div class="form-group"><label>Nome *</label><input name="name" id="eNome" required></div>
+      <div class="form-group"><label>Cidade</label><input name="city" id="eCidade"></div>
+      <div class="form-group"><label>Endereço</label><input name="address" id="eEnd"></div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Salvar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openEdit(id, name, city, address) {
+  document.getElementById('editForm').action = `/igrejas/congregacoes/${id}/edit`;
+  document.getElementById('eNome').value  = name;
+  document.getElementById('eCidade').value = city;
+  document.getElementById('eEnd').value   = address;
+  openModal('editModal');
+}
+</script>
+{% endblock %}

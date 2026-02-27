@@ -6,30 +6,53 @@
   <span style="color:var(--muted);font-size:.875rem;">{{ trimesters | length }} trimestre(s)</span>
   <button class="btn btn-primary" onclick="openModal('createModal')">+ Novo Trimestre</button>
 </div>
+
 <div class="card">
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Nome</th><th>Ano</th><th>Trimestre</th><th>Período</th><th>Dias</th><th>Aulas</th><th>Ações</th></tr></thead>
+      <thead><tr><th>Nome</th><th>Ano</th><th>Trim.</th><th>Período</th><th>Dias</th><th>Aulas</th><th>Ações</th></tr></thead>
       <tbody>
         {% for t in trimesters %}
+        {% set info = trimester_info[t.id] %}
+        {% set day_names = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] %}
         <tr>
           <td><div style="font-weight:500;">{{ t.name }}</div></td>
           <td>{{ t.year }}</td>
           <td><span class="badge badge-blue">{{ t.quarter }}º</span></td>
           <td style="color:var(--muted);font-size:.8rem;">{{ t.start_date | fmt_date }} → {{ t.end_date | fmt_date }}</td>
           <td style="color:var(--muted);font-size:.8rem;">
-            {% set day_names = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] %}
             {% for d in t.weekdays.split(',') %}{% if d.strip() %}{{ day_names[d.strip()|int] }}{% if not loop.last %}, {% endif %}{% endif %}{% endfor %}
           </td>
-          <td>{{ t.lessons.count() }}</td>
-          <td style="display:flex;gap:6px;">
-            <form method="POST" action="{{ url_for('trimesters.generate', id=t.id) }}" onsubmit="return confirm('Gerar aulas para todas as turmas?')">
-              <button class="btn btn-success btn-sm">⚡ Gerar</button>
-            </form>
-            <button class="btn btn-secondary btn-sm" onclick="openEdit({{ t.id }}, '{{ t.name }}', {{ t.year }}, {{ t.quarter }}, '{{ t.start_date }}', '{{ t.end_date }}', '{{ t.weekdays }}', '{{ t.lesson_prefix }}')">✏️</button>
-            <form method="POST" action="{{ url_for('trimesters.delete', id=t.id) }}" onsubmit="return confirm('Remover trimestre e todas as aulas?')">
-              <button class="btn btn-danger btn-sm">🗑️</button>
-            </form>
+          <td>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <span class="badge badge-yellow" style="font-size:.7rem;">{{ info.total }} total</span>
+              {% if info.finalized > 0 %}<span class="badge badge-green" style="font-size:.7rem;">{{ info.finalized }} finalizada(s)</span>{% endif %}
+              {% if info.liberado > 0 %}<span class="badge badge-yellow" style="font-size:.65rem;">{{ info.liberado }} liberada(s)</span>{% endif %}
+            </div>
+          </td>
+          <td style="display:flex;gap:6px;align-items:center;">
+            {# Botão Gerar: desabilitado se já tem aulas #}
+            {% if info.total > 0 %}
+            <button class="btn btn-secondary btn-sm" disabled title="Já existem aulas geradas para esta congregação"
+              style="opacity:.45;cursor:not-allowed;">⚡ Gerar</button>
+            {% else %}
+            <button class="btn btn-success btn-sm"
+              onclick="openGenerate({{ t.id }}, '{{ t.name | e }}')">
+              ⚡ Gerar
+            </button>
+            {% endif %}
+
+            <button class="btn btn-secondary btn-sm"
+              onclick="openEdit({{ t.id }}, '{{ t.name | e }}', {{ t.year }}, {{ t.quarter }}, '{{ t.start_date }}', '{{ t.end_date }}', '{{ t.weekdays }}', '{{ t.lesson_prefix | e }}')">✏️</button>
+
+            {# Botão Excluir: desabilitado se tem aulas fechadas/liberadas #}
+            {% if info.has_closed %}
+            <button class="btn btn-danger btn-sm" disabled title="Impossível excluir: há aulas finalizadas ou liberadas"
+              style="opacity:.45;cursor:not-allowed;">🗑️</button>
+            {% else %}
+            <button class="btn btn-danger btn-sm"
+              onclick="openDelete({{ t.id }}, '{{ t.name | e }}', {{ info.total }})">🗑️</button>
+            {% endif %}
           </td>
         </tr>
         {% else %}
@@ -40,6 +63,60 @@
   </div>
 </div>
 
+<!-- ── Modal Confirmar Geração ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="generateModal">
+  <div class="modal" style="max-width:420px;">
+    <button class="modal-close" onclick="closeModal('generateModal')">✕</button>
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:2.5rem;margin-bottom:8px;">⚡</div>
+      <h3 style="margin-bottom:4px;">Gerar Aulas</h3>
+      <p id="genSubtitle" style="color:var(--muted);font-size:.85rem;"></p>
+    </div>
+    <div style="background:var(--hover);border-radius:10px;padding:16px;margin-bottom:20px;font-size:.875rem;">
+      <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+        <span style="color:#2d9cdb;">ℹ️</span><strong>O que será gerado:</strong>
+      </div>
+      <div style="color:var(--muted);display:flex;flex-direction:column;gap:4px;padding-left:4px;">
+        <div>✦ Aulas para <strong style="color:var(--text);">{{ current_user.congregation.name if current_user.congregation else 'todas as turmas' }}</strong></div>
+        <div>✦ Uma aula por turma em cada data do trimestre</div>
+        <div>✦ Registros de presença para todos os alunos matriculados</div>
+      </div>
+    </div>
+    <form method="POST" id="generateForm">
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-success" type="submit" style="flex:1;">✅ Confirmar e Gerar</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('generateModal')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal Confirmar Exclusão ───────────────────────────────────────────── -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal" style="max-width:400px;">
+    <button class="modal-close" onclick="closeModal('deleteModal')">✕</button>
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:2.5rem;margin-bottom:8px;">🗑️</div>
+      <h3 style="margin-bottom:4px;">Excluir Trimestre</h3>
+      <p id="delSubtitle" style="color:var(--muted);font-size:.85rem;"></p>
+    </div>
+    <div id="delWarningBox" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:14px;margin-bottom:16px;font-size:.85rem;color:#ef4444;">
+      ⚠️ Este trimestre possui <strong id="delCount"></strong> aula(s) cadastrada(s).<br>
+      <span style="color:var(--muted);font-size:.8rem;">Todas as aulas e registros de presença serão removidos permanentemente.</span>
+    </div>
+    <div style="background:var(--hover);border-radius:10px;padding:12px;margin-bottom:20px;font-size:.82rem;color:var(--muted);">
+      Esta ação <strong style="color:var(--text);">não pode ser desfeita</strong>. Tem certeza?
+    </div>
+    <form method="POST" id="deleteForm">
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-danger" type="submit" style="flex:1;">🗑️ Sim, Excluir</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal Criar ─────────────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="createModal">
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeModal('createModal')">✕</button>
@@ -48,10 +125,15 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="form-group"><label>Nome *</label><input name="name" required placeholder="1º Trimestre 2025"></div>
         <div class="form-group"><label>Prefixo das Lições</label><input name="lesson_prefix" value="Lição"></div>
-        <div class="form-group"><label>Ano</label><input type="number" name="year" value="{{ now.year if now else 2025 }}"></div>
-        <div class="form-group"><label>Trimestre</label><select name="quarter"><option value="1">1º</option><option value="2">2º</option><option value="3">3º</option><option value="4">4º</option></select></div>
-        <div class="form-group"><label>Início</label><input type="date" name="start_date" required></div>
-        <div class="form-group"><label>Fim</label><input type="date" name="end_date" required></div>
+        <div class="form-group"><label>Ano</label><input type="number" name="year" value="{{ now.year }}"></div>
+        <div class="form-group"><label>Trimestre</label>
+          <select name="quarter">
+            <option value="1">1º</option><option value="2">2º</option>
+            <option value="3">3º</option><option value="4">4º</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Início *</label><input type="date" name="start_date" required></div>
+        <div class="form-group"><label>Fim *</label><input type="date" name="end_date" required></div>
       </div>
       <div class="form-group">
         <label>Dias da Semana</label>
@@ -69,6 +151,7 @@
   </div>
 </div>
 
+<!-- ── Modal Editar ────────────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="editModal">
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeModal('editModal')">✕</button>
@@ -78,9 +161,14 @@
         <div class="form-group"><label>Nome *</label><input name="name" id="eName" required></div>
         <div class="form-group"><label>Prefixo das Lições</label><input name="lesson_prefix" id="ePrefix"></div>
         <div class="form-group"><label>Ano</label><input type="number" name="year" id="eYear"></div>
-        <div class="form-group"><label>Trimestre</label><select name="quarter" id="eQuarter"><option value="1">1º</option><option value="2">2º</option><option value="3">3º</option><option value="4">4º</option></select></div>
-        <div class="form-group"><label>Início</label><input type="date" name="start_date" id="eStart"></div>
-        <div class="form-group"><label>Fim</label><input type="date" name="end_date" id="eEnd"></div>
+        <div class="form-group"><label>Trimestre</label>
+          <select name="quarter" id="eQuarter">
+            <option value="1">1º</option><option value="2">2º</option>
+            <option value="3">3º</option><option value="4">4º</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Início *</label><input type="date" name="start_date" id="eStart"></div>
+        <div class="form-group"><label>Fim *</label><input type="date" name="end_date" id="eEnd"></div>
       </div>
       <div class="form-group">
         <label>Dias da Semana</label>
@@ -98,16 +186,36 @@
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
+function openGenerate(id, name) {
+  document.getElementById('generateForm').action = `/trimestres/${id}/generate`;
+  document.getElementById('genSubtitle').textContent = `Trimestre: ${name}`;
+  openModal('generateModal');
+}
+
+function openDelete(id, name, count) {
+  document.getElementById('deleteForm').action = `/trimestres/${id}/delete`;
+  document.getElementById('delSubtitle').textContent = `Trimestre: ${name}`;
+  const warn = document.getElementById('delWarningBox');
+  if (count > 0) {
+    warn.style.display = 'block';
+    document.getElementById('delCount').textContent = count;
+  } else {
+    warn.style.display = 'none';
+  }
+  openModal('deleteModal');
+}
+
 function openEdit(id, name, year, quarter, start, end, weekdays, prefix) {
   document.getElementById('editForm').action = `/trimestres/${id}/edit`;
-  document.getElementById('eName').value = name;
-  document.getElementById('eYear').value = year;
+  document.getElementById('eName').value    = name;
+  document.getElementById('eYear').value    = year;
   document.getElementById('eQuarter').value = quarter;
-  document.getElementById('eStart').value = start;
-  document.getElementById('eEnd').value = end;
-  document.getElementById('ePrefix').value = prefix;
+  document.getElementById('eStart').value   = start;
+  document.getElementById('eEnd').value     = end;
+  document.getElementById('ePrefix').value  = prefix;
   const active = weekdays.split(',').map(d => d.trim());
   document.querySelectorAll('.edit-weekday').forEach(cb => {
     cb.checked = active.includes(cb.dataset.val);

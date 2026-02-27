@@ -1,11 +1,12 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required, current_user
 from app import db
 from app.models.lesson import Lesson
 from app.models.attendance import Attendance
 from app.models.klass import Class
 from app.models.trimester import Trimester
 from app.utils.decorators import admin_required
+from app.utils.scope import scoped, scoped_lessons
 from datetime import datetime
 
 lessons_bp = Blueprint('lessons', __name__, url_prefix='/aulas')
@@ -22,13 +23,16 @@ def parse_date(s):
 @admin_required
 def index():
     search = request.args.get('q', '')
-    q = Lesson.query
+    q = scoped_lessons()
     if search:
         q = q.filter(Lesson.title.ilike(f'%{search}%'))
     lessons = q.order_by(Lesson.date.desc()).all()
-    classes = Class.query.order_by(Class.name).all()
+
+    # Só turmas e trimestres da congregação do usuário
+    classes    = scoped(Class).order_by(Class.name).all()
     trimesters = Trimester.query.order_by(Trimester.year.desc()).all()
-    return render_template('lessons/index.html', lessons=lessons, classes=classes, trimesters=trimesters, search=search)
+    return render_template('lessons/index.html', lessons=lessons, classes=classes,
+                           trimesters=trimesters, search=search)
 
 @lessons_bp.route('/create', methods=['POST'])
 @login_required
@@ -41,7 +45,6 @@ def create():
         class_id=class_id,
         trimester_id=request.form.get('trimester_id', type=int) or None,
         description=request.form.get('description', '').strip() or None,
-        offering=float(request.form.get('offering', 0) or 0),
         status='ABERTO'
     )
     db.session.add(lesson)
@@ -64,7 +67,6 @@ def edit(id):
     l.class_id = request.form.get('class_id', l.class_id, type=int)
     l.trimester_id = request.form.get('trimester_id', type=int) or None
     l.description = request.form.get('description', '').strip() or None
-    l.offering = float(request.form.get('offering', 0) or 0)
     db.session.commit()
     flash('Aula atualizada!', 'success')
     return redirect(url_for('lessons.index'))
@@ -79,26 +81,13 @@ def delete(id):
     flash('Aula removida.', 'success')
     return redirect(url_for('lessons.index'))
 
-@lessons_bp.route('/<int:id>/advance', methods=['POST'])
+@lessons_bp.route('/<int:id>/set-status', methods=['POST'])
 @login_required
 @admin_required
-def advance(id):
+def set_status(id):
     l = Lesson.query.get_or_404(id)
-    idx = STATUS_ORDER.index(l.status)
-    if idx < len(STATUS_ORDER) - 1:
-        l.status = STATUS_ORDER[idx + 1]
+    new_status = request.form.get('status')
+    if new_status in STATUS_ORDER:
+        l.status = new_status
         db.session.commit()
-    flash(f'Status: {l.status}', 'success')
-    return redirect(url_for('lessons.index'))
-
-@lessons_bp.route('/<int:id>/retreat', methods=['POST'])
-@login_required
-@admin_required
-def retreat(id):
-    l = Lesson.query.get_or_404(id)
-    idx = STATUS_ORDER.index(l.status)
-    if idx > 0:
-        l.status = STATUS_ORDER[idx - 1]
-        db.session.commit()
-    flash(f'Status: {l.status}', 'success')
-    return redirect(url_for('lessons.index'))
+    return jsonify({'status': l.status})

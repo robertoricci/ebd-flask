@@ -1,11 +1,12 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required
+from flask_login import login_required, current_user
 from app import db
 from app.models.lesson import Lesson
 from app.models.attendance import Attendance
 from app.models.klass import Class
 from app.models.trimester import Trimester
 from app.utils.decorators import admin_required
+from app.utils.scope import scoped, scoped_lessons
 from datetime import datetime
 
 lessons_bp = Blueprint('lessons', __name__, url_prefix='/aulas')
@@ -22,13 +23,16 @@ def parse_date(s):
 @admin_required
 def index():
     search = request.args.get('q', '')
-    q = Lesson.query
+    q = scoped_lessons()
     if search:
         q = q.filter(Lesson.title.ilike(f'%{search}%'))
     lessons = q.order_by(Lesson.date.desc()).all()
-    classes = Class.query.order_by(Class.name).all()
+
+    # Só turmas e trimestres da congregação do usuário
+    classes    = scoped(Class).order_by(Class.name).all()
     trimesters = Trimester.query.order_by(Trimester.year.desc()).all()
-    return render_template('lessons/index.html', lessons=lessons, classes=classes, trimesters=trimesters, search=search)
+    return render_template('lessons/index.html', lessons=lessons, classes=classes,
+                           trimesters=trimesters, search=search)
 
 @lessons_bp.route('/create', methods=['POST'])
 @login_required
@@ -81,7 +85,6 @@ def delete(id):
 @login_required
 @admin_required
 def set_status(id):
-    """AJAX - define status diretamente."""
     l = Lesson.query.get_or_404(id)
     new_status = request.form.get('status')
     if new_status in STATUS_ORDER:
