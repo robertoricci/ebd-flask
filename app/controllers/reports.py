@@ -20,16 +20,26 @@ def _natural_sort_key(s):
 
 
 def _get_filters():
-    trimester_id  = request.args.get('trimester_id', type=int)
-    class_id      = request.args.get('class_id', type=int)
-    lesson_title  = request.args.get('lesson_title', '').strip()
-    return trimester_id, class_id, lesson_title
+    year         = request.args.get('year', type=int)
+    trimester_id = request.args.get('trimester_id', type=int)
+    class_id     = request.args.get('class_id', type=int)
+    lesson_title = request.args.get('lesson_title', '').strip()
+    return year, trimester_id, class_id, lesson_title
 
 
-def _get_unique_lesson_titles(trimester_id=None, class_id=None):
+def _get_years():
+    rows = db.session.query(Trimester.year).distinct().order_by(Trimester.year.desc()).all()
+    return [r[0] for r in rows]
+
+
+def _get_unique_lesson_titles(year=None, trimester_id=None, class_id=None):
     q = db.session.query(Lesson.title).distinct()
     if trimester_id:
         q = q.filter(Lesson.trimester_id == trimester_id)
+    elif year:
+        trimester_ids = [t.id for t in Trimester.query.filter_by(year=year).all()]
+        if trimester_ids:
+            q = q.filter(Lesson.trimester_id.in_(trimester_ids))
     if class_id:
         q = q.filter(Lesson.class_id == class_id)
     titles = [row[0] for row in q.all() if row[0]]
@@ -45,12 +55,16 @@ def _enrolled_count(class_id):
     ).scalar() or 0
 
 
-def _build_stats(trimester_id, class_id, lesson_title):
+def _build_stats(year, trimester_id, class_id, lesson_title):
     classes = Class.query.order_by(Class.name).all()
 
     q = Lesson.query
     if trimester_id:
         q = q.filter_by(trimester_id=trimester_id)
+    elif year:
+        trimester_ids = [t.id for t in Trimester.query.filter_by(year=year).all()]
+        if trimester_ids:
+            q = q.filter(Lesson.trimester_id.in_(trimester_ids))
     if class_id:
         q = q.filter_by(class_id=class_id)
     if lesson_title:
@@ -65,10 +79,13 @@ def _build_stats(trimester_id, class_id, lesson_title):
             continue
 
         enrolled       = _enrolled_count(c.id)
-        present        = Attendance.query.filter(Attendance.lesson_id.in_(cls_ids), Attendance.present == True).count()
-        absent         = Attendance.query.filter(Attendance.lesson_id.in_(cls_ids), Attendance.present == False).count()
-        total_att      = present + absent
-        pct            = round((present / total_att) * 100, 1) if total_att > 0 else 0.0
+        present        = Attendance.query.filter(
+                            Attendance.lesson_id.in_(cls_ids),
+                            Attendance.present == True
+                         ).count()
+        # Ausentes = matriculados - presentes (na seleção filtrada)
+        absent         = max(enrolled - present, 0)
+        pct            = round((present / enrolled) * 100, 1) if enrolled > 0 else 0.0
         visitors_count = Visitor.query.filter(Visitor.lesson_id.in_(cls_ids)).count()
         offering       = db.session.query(func.sum(Lesson.offering)).filter(Lesson.id.in_(cls_ids)).scalar() or 0.0
         bibles         = db.session.query(func.sum(Lesson.bibles)).filter(Lesson.id.in_(cls_ids)).scalar() or 0
@@ -78,7 +95,6 @@ def _build_stats(trimester_id, class_id, lesson_title):
         class_stats.append({
             'name':        c.name,
             'enrolled':    enrolled,
-            'lessons':     len(cls_ids),
             'present':     present,
             'absent':      absent,
             'visitors':    visitors_count,
@@ -90,7 +106,6 @@ def _build_stats(trimester_id, class_id, lesson_title):
         })
 
     total_enrolled  = sum(s['enrolled']    for s in class_stats)
-    total_lessons   = sum(s['lessons']     for s in class_stats)
     total_present   = sum(s['present']     for s in class_stats)
     total_absent    = sum(s['absent']      for s in class_stats)
     total_visitors  = sum(s['visitors']    for s in class_stats)
@@ -98,10 +113,9 @@ def _build_stats(trimester_id, class_id, lesson_title):
     total_offering  = sum(s['offering']    for s in class_stats)
     total_bibles    = sum(s['bibles']      for s in class_stats)
     total_magazines = sum(s['magazines']   for s in class_stats)
-    denom           = total_present + total_absent
-    total_pct       = round((total_present / denom) * 100, 1) if denom > 0 else 0.0
+    total_pct       = round((total_present / total_enrolled) * 100, 1) if total_enrolled > 0 else 0.0
 
-    return (class_stats, total_enrolled, total_lessons, total_present, total_absent,
+    return (class_stats, total_enrolled, total_present, total_absent,
             total_visitors, total_geral, total_pct, total_offering, total_bibles, total_magazines)
 
 
@@ -109,16 +123,25 @@ def _build_stats(trimester_id, class_id, lesson_title):
 @login_required
 @admin_required
 def index():
-    trimesters    = Trimester.query.order_by(Trimester.year.desc()).all()
-    classes       = Class.query.order_by(Class.name).all()
-    trimester_id, class_id, lesson_title = _get_filters()
-    lesson_titles = _get_unique_lesson_titles(trimester_id, class_id)
+    years         = _get_years()
+    year, trimester_id, class_id, lesson_title = _get_filters()
 
-    (class_stats, total_enrolled, total_lessons, total_present, total_absent,
+    # Trimestres filtrados pelo ano selecionado
+    tq = Trimester.query.order_by(Trimester.year.desc(), Trimester.quarter)
+    if year:
+        tq = tq.filter_by(year=year)
+    trimesters = tq.all()
+
+    classes       = Class.query.order_by(Class.name).all()
+    lesson_titles = _get_unique_lesson_titles(year, trimester_id, class_id)
+
+    (class_stats, total_enrolled, total_present, total_absent,
      total_visitors, total_geral, total_pct, total_offering,
-     total_bibles, total_magazines) = _build_stats(trimester_id, class_id, lesson_title)
+     total_bibles, total_magazines) = _build_stats(year, trimester_id, class_id, lesson_title)
 
     filter_labels = []
+    if year:
+        filter_labels.append(('Ano', str(year)))
     if trimester_id:
         t = Trimester.query.get(trimester_id)
         if t: filter_labels.append(('Trimestre', t.name))
@@ -126,15 +149,15 @@ def index():
         c = Class.query.get(class_id)
         if c: filter_labels.append(('Turma', c.name))
     if lesson_title:
-        filter_labels.append(('Licao', lesson_title))
+        filter_labels.append(('Lição', lesson_title))
 
     return render_template('reports/index.html',
-        trimesters=trimesters, classes=classes,
+        years=years, trimesters=trimesters, classes=classes,
         lesson_titles=lesson_titles,
-        trimester_id=trimester_id, class_id=class_id, lesson_title=lesson_title,
+        year=year, trimester_id=trimester_id, class_id=class_id, lesson_title=lesson_title,
         filter_labels=filter_labels,
         class_stats=class_stats,
-        total_enrolled=total_enrolled, total_lessons=total_lessons,
+        total_enrolled=total_enrolled,
         total_present=total_present, total_absent=total_absent,
         total_visitors=total_visitors, total_geral=total_geral,
         total_pct=total_pct, total_offering=total_offering,
@@ -157,19 +180,21 @@ def pdf():
         from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
                                         Paragraph, Spacer, HRFlowable)
         from reportlab.lib.styles import ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
     except ImportError:
         return "Erro: instale reportlab", 500
 
     import io
 
-    trimester_id, class_id, lesson_title = _get_filters()
+    year, trimester_id, class_id, lesson_title = _get_filters()
 
-    (class_stats, total_enrolled, total_lessons, total_present, total_absent,
+    (class_stats, total_enrolled, total_present, total_absent,
      total_visitors, total_geral, total_pct, total_offering,
-     total_bibles, total_magazines) = _build_stats(trimester_id, class_id, lesson_title)
+     total_bibles, total_magazines) = _build_stats(year, trimester_id, class_id, lesson_title)
 
     filter_parts = []
+    if year:
+        filter_parts.append(f'Ano: {year}')
     if trimester_id:
         t = Trimester.query.get(trimester_id)
         if t: filter_parts.append(f'Trimestre: {t.name}')
@@ -198,8 +223,8 @@ def pdf():
         return C_RED
 
     sTitle  = ParagraphStyle('sT', fontSize=18, textColor=C_HEAD, fontName='Helvetica-Bold', spaceAfter=3)
-    sSub    = ParagraphStyle('sS', fontSize=8, textColor=C_MUTED, fontName='Helvetica', spaceAfter=6)
-    sFilter = ParagraphStyle('sF', fontSize=8, textColor=C_WHITE, fontName='Helvetica-Bold',
+    sSub    = ParagraphStyle('sS', fontSize=8,  textColor=C_MUTED, fontName='Helvetica', spaceAfter=6)
+    sFilter = ParagraphStyle('sF', fontSize=8,  textColor=C_WHITE, fontName='Helvetica-Bold',
                               spaceAfter=12, backColor=C_CARD2, borderPad=5, leftIndent=4)
     sSec    = ParagraphStyle('sSc', fontSize=9, textColor=C_MUTED, fontName='Helvetica-Bold',
                               spaceAfter=6, spaceBefore=10)
@@ -212,23 +237,23 @@ def pdf():
                             topMargin=1.5*cm, bottomMargin=1.5*cm)
     story = []
 
-    # Cabeçalho
     story.append(Paragraph('EBD - Relatorio de Frequencia', sTitle))
     story.append(Paragraph(f'Gerado em: {datetime.now().strftime("%d/%m/%Y as %H:%M")}', sSub))
     filtro_str = '    |    '.join(filter_parts) if filter_parts else 'Todos os dados'
     story.append(Paragraph(f'Filtros: {filtro_str}', sFilter))
 
-    # Cards de resumo (10 indicadores)
+    # Cards resumo
     story.append(Paragraph('Resumo Geral', sSec))
-    sum_labels = ['Matriculados','Aulas','Presentes','Ausentes','Visitantes',
-                  'Total P+V','Frequencia','Biblias','Revistas','Oferta']
-    sum_values = [str(total_enrolled), str(total_lessons), str(total_present),
-                  str(total_absent), str(total_visitors), str(total_geral),
-                  f'{total_pct}%', str(total_bibles), str(total_magazines), _fmt_cur(total_offering)]
-    sum_colors = [C_BLUE, C_YELLOW, C_GREEN, C_RED, C_PURPLE,
-                  C_BLUE, pct_col(total_pct), C_YELLOW, C_RED, C_GREEN]
+    sum_labels = ['Matriculados','Presentes','Ausentes','Visitantes',
+                  'Total P+V','Biblias','Revistas','Oferta','Frequencia']
+    sum_values = [str(total_enrolled), str(total_present), str(total_absent),
+                  str(total_visitors), str(total_geral),
+                  str(total_bibles), str(total_magazines),
+                  _fmt_cur(total_offering), f'{total_pct}%']
+    sum_colors = [C_BLUE, C_GREEN, C_RED, C_PURPLE,
+                  C_BLUE, C_YELLOW, C_RED, C_GREEN, pct_col(total_pct)]
 
-    sum_t = Table([sum_labels, sum_values], colWidths=[2.5*cm]*10)
+    sum_t = Table([sum_labels, sum_values], colWidths=[2.9*cm]*9)
     sum_ts = TableStyle([
         ('BACKGROUND',    (0,0), (-1,0), C_CARD),
         ('BACKGROUND',    (0,1), (-1,1), C_BG),
@@ -248,7 +273,7 @@ def pdf():
     sum_t.setStyle(sum_ts)
     story.append(sum_t)
 
-    # Barras de frequência
+    # Barras
     if class_stats:
         story.append(Paragraph('Frequencia por Turma', sSec))
         bar_data = []
@@ -268,32 +293,31 @@ def pdf():
             ('LINEBELOW',     (0,0), (-1,-2), 0.3, C_BORDER),
         ])
         for i in range(len(bar_data)):
-            bg = C_CARD2 if i % 2 == 0 else C_CARD
-            bar_ts.add('BACKGROUND', (0,i), (-1,i), bg)
+            bar_ts.add('BACKGROUND', (0,i), (-1,i), C_CARD2 if i % 2 == 0 else C_CARD)
         bar_t.setStyle(bar_ts)
         story.append(bar_t)
 
-    # Tabela detalhada
+    # Tabela detalhada — sem coluna Aulas, Frequência por último
     story.append(Paragraph('Detalhamento por Turma', sSec))
-    headers = ['Turma','Matriculados','Aulas','Presentes','Ausentes',
-               'Visitantes','Total P+V','Freq.','Biblias','Revistas','Oferta']
+    headers  = ['Turma','Matriculados','Presentes','Ausentes',
+                'Visitantes','Total P+V','Biblias','Revistas','Oferta','Freq.']
     det_rows = [headers]
     for s in class_stats:
         det_rows.append([
-            s['name'], str(s['enrolled']), str(s['lessons']),
+            s['name'], str(s['enrolled']),
             str(s['present']), str(s['absent']), str(s['visitors']),
-            str(s['total_geral']), f"{s['pct']}%",
-            str(s['bibles']), str(s['magazines']), _fmt_cur(s['offering']),
+            str(s['total_geral']), str(s['bibles']), str(s['magazines']),
+            _fmt_cur(s['offering']), f"{s['pct']}%",
         ])
     det_rows.append([
-        'TOTAL', str(total_enrolled), str(total_lessons),
+        'TOTAL', str(total_enrolled),
         str(total_present), str(total_absent), str(total_visitors),
-        str(total_geral), f'{total_pct}%',
-        str(total_bibles), str(total_magazines), _fmt_cur(total_offering),
+        str(total_geral), str(total_bibles), str(total_magazines),
+        _fmt_cur(total_offering), f'{total_pct}%',
     ])
 
-    cw11 = [3.5*cm,2.2*cm,1.6*cm,2.2*cm,2.2*cm,2.2*cm,2.2*cm,1.8*cm,2*cm,2*cm,2.7*cm]
-    det_t = Table(det_rows, colWidths=cw11, repeatRows=1)
+    cw10 = [3.8*cm,2.4*cm,2.4*cm,2.4*cm,2.4*cm,2.4*cm,2*cm,2*cm,3*cm,2*cm]
+    det_t = Table(det_rows, colWidths=cw10, repeatRows=1)
     det_ts = TableStyle([
         ('BACKGROUND',    (0,0),  (-1,0),  C_HEAD),
         ('TEXTCOLOR',     (0,0),  (-1,0),  C_WHITE),
@@ -313,18 +337,18 @@ def pdf():
         ('LEFTPADDING',   (0,1),  (0,-1),  6),
         ('GRID',          (0,0),  (-1,-1), 0.4, C_BORDER),
     ])
+    freq_col = 9
     for i, s in enumerate(class_stats, start=1):
-        det_ts.add('TEXTCOLOR', (3,i), (3,i), C_GREEN)
-        det_ts.add('TEXTCOLOR', (4,i), (4,i), C_RED)
-        det_ts.add('TEXTCOLOR', (7,i), (7,i), pct_col(s['pct']))
+        det_ts.add('TEXTCOLOR', (2,i), (2,i), C_GREEN)
+        det_ts.add('TEXTCOLOR', (3,i), (3,i), C_RED)
+        det_ts.add('TEXTCOLOR', (freq_col,i), (freq_col,i), pct_col(s['pct']))
     tr = len(det_rows) - 1
-    det_ts.add('TEXTCOLOR', (3,tr), (3,tr), C_GREEN)
-    det_ts.add('TEXTCOLOR', (4,tr), (4,tr), C_RED)
-    det_ts.add('TEXTCOLOR', (7,tr), (7,tr), pct_col(total_pct))
+    det_ts.add('TEXTCOLOR', (2,tr), (2,tr), C_GREEN)
+    det_ts.add('TEXTCOLOR', (3,tr), (3,tr), C_RED)
+    det_ts.add('TEXTCOLOR', (freq_col,tr), (freq_col,tr), pct_col(total_pct))
     det_t.setStyle(det_ts)
     story.append(det_t)
 
-    # Rodapé
     story.append(Spacer(1, 0.4*cm))
     story.append(HRFlowable(width='100%', thickness=0.5, color=C_BORDER))
     story.append(Paragraph(

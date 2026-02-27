@@ -6,75 +6,151 @@ from app.models.attendance import Attendance
 from app.models.visitor import Visitor
 from app.models.trimester import Trimester
 from app.models.klass import Class
-from app.models.student import Student
+from app.models.student import Student, class_students
 from app.models.teacher import Teacher
 from datetime import date
-from sqlalchemy import func
+from sqlalchemy import func, select
+import re
 
 dashboard_bp = Blueprint('dashboard', __name__)
+
+
+def _natural_sort_key(s):
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s or '')]
+
+
+def _enrolled_count(class_id):
+    return db.session.execute(
+        select(func.count()).select_from(class_students).where(
+            class_students.c.class_id == class_id
+        )
+    ).scalar() or 0
+
 
 @dashboard_bp.route('/dashboard')
 @login_required
 def index():
-    trimesters = Trimester.query.order_by(Trimester.year.desc(), Trimester.quarter.desc()).all()
-    classes = Class.query.order_by(Class.name).all()
-    
+    # ── Filtros ──────────────────────────────────────────────────────────────
+    year         = request.args.get('year', type=int)
     trimester_id = request.args.get('trimester_id', type=int)
-    filter_date = request.args.get('date', '')
-    class_id = request.args.get('class_id', type=int)
+    class_id     = request.args.get('class_id', type=int)
+    lesson_title = request.args.get('lesson_title', '').strip()
 
+    # Anos disponíveis
+    years = [r[0] for r in db.session.query(Trimester.year).distinct().order_by(Trimester.year.desc()).all()]
+
+    # Trimestres (filtrados por ano se selecionado)
+    tq = Trimester.query.order_by(Trimester.year.desc(), Trimester.quarter)
+    if year:
+        tq = tq.filter_by(year=year)
+    trimesters = tq.all()
+
+    classes = Class.query.order_by(Class.name).all()
+
+    # Títulos de lições únicos
+    lq = db.session.query(Lesson.title).distinct()
+    if trimester_id:
+        lq = lq.filter(Lesson.trimester_id == trimester_id)
+    elif year:
+        t_ids = [t.id for t in Trimester.query.filter_by(year=year).all()]
+        if t_ids:
+            lq = lq.filter(Lesson.trimester_id.in_(t_ids))
+    if class_id:
+        lq = lq.filter(Lesson.class_id == class_id)
+    lesson_titles = sorted([r[0] for r in lq.all() if r[0]], key=_natural_sort_key)
+
+    # ── Filtrar lições ────────────────────────────────────────────────────────
     q = Lesson.query
     if trimester_id:
         q = q.filter_by(trimester_id=trimester_id)
-    if filter_date:
-        try:
-            from datetime import datetime
-            fd = datetime.strptime(filter_date, '%Y-%m-%d').date()
-            q = q.filter_by(date=fd)
-        except:
-            pass
+    elif year:
+        t_ids = [t.id for t in Trimester.query.filter_by(year=year).all()]
+        if t_ids:
+            q = q.filter(Lesson.trimester_id.in_(t_ids))
     if class_id:
         q = q.filter_by(class_id=class_id)
-
-    lessons = q.all()
+    if lesson_title:
+        q = q.filter(Lesson.title == lesson_title)
+    lessons    = q.order_by(Lesson.date).all()
     lesson_ids = [l.id for l in lessons]
 
-    total_students = Student.query.count()
-    total_teachers = Teacher.query.count()
-    total_classes = Class.query.count()
-    total_lessons = len(lessons)
+    # ── Stats por turma (igual ao relatório) ─────────────────────────────────
+    class_stats = []
+    for c in classes:
+        cls_ids = [l.id for l in lessons if l.class_id == c.id]
+        if not cls_ids:
+            continue
+        enrolled  = _enrolled_count(c.id)
+        present   = Attendance.query.filter(Attendance.lesson_id.in_(cls_ids), Attendance.present == True).count()
+        absent    = max(enrolled - present, 0)
+        pct       = round((present / enrolled) * 100, 1) if enrolled > 0 else 0.0
+        visitors  = Visitor.query.filter(Visitor.lesson_id.in_(cls_ids)).count()
+        offering  = db.session.query(func.sum(Lesson.offering)).filter(Lesson.id.in_(cls_ids)).scalar() or 0.0
+        bibles    = db.session.query(func.sum(Lesson.bibles)).filter(Lesson.id.in_(cls_ids)).scalar() or 0
+        magazines = db.session.query(func.sum(Lesson.magazines)).filter(Lesson.id.in_(cls_ids)).scalar() or 0
+        class_stats.append({
+            'name': c.name, 'enrolled': enrolled,
+            'present': present, 'absent': absent,
+            'visitors': visitors, 'total_geral': present + visitors,
+            'pct': pct, 'offering': offering,
+            'bibles': bibles, 'magazines': magazines,
+        })
 
-    att_q = Attendance.query.filter(Attendance.lesson_id.in_(lesson_ids)) if lesson_ids else Attendance.query.filter(db.false())
-    total_present = att_q.filter_by(present=True).count() if lesson_ids else 0
-    total_absent = att_q.filter_by(present=False).count() if lesson_ids else 0
-    total_visitors = Visitor.query.filter(Visitor.lesson_id.in_(lesson_ids)).count() if lesson_ids else 0
-    total_offering = db.session.query(func.sum(Lesson.offering)).filter(Lesson.id.in_(lesson_ids)).scalar() or 0
+    total_enrolled  = sum(s['enrolled']    for s in class_stats)
+    total_present   = sum(s['present']     for s in class_stats)
+    total_absent    = sum(s['absent']      for s in class_stats)
+    total_visitors  = sum(s['visitors']    for s in class_stats)
+    total_geral     = sum(s['total_geral'] for s in class_stats)
+    total_offering  = sum(s['offering']    for s in class_stats)
+    total_bibles    = sum(s['bibles']      for s in class_stats)
+    total_magazines = sum(s['magazines']   for s in class_stats)
+    total_pct       = round((total_present / total_enrolled) * 100, 1) if total_enrolled > 0 else 0.0
 
-    freq_pct = round((total_present / (total_present + total_absent)) * 100, 1) if (total_present + total_absent) > 0 else 0
+    # ── Dados para o gráfico (frequência por data/lição) ─────────────────────
+    chart_labels = []
+    chart_data   = []
+    if lesson_ids:
+        # Agrupa por data: para cada data, calcula % de presença
+        from collections import defaultdict
+        by_date = defaultdict(lambda: {'present': 0, 'enrolled': 0})
+        for l in lessons:
+            c_enrolled = _enrolled_count(l.class_id)
+            c_present  = Attendance.query.filter_by(lesson_id=l.id, present=True).count()
+            key = l.date.strftime('%d/%m')
+            by_date[key]['present']  += c_present
+            by_date[key]['enrolled'] += c_enrolled
 
+        for label in sorted(by_date.keys(), key=lambda d: (d[3:], d[:2])):
+            v = by_date[label]
+            pct = round((v['present'] / v['enrolled']) * 100, 1) if v['enrolled'] > 0 else 0
+            chart_labels.append(label)
+            chart_data.append(pct)
+
+    # ── Aniversariantes do mês ────────────────────────────────────────────────
     today = date.today()
-    today_lessons = Lesson.query.filter_by(date=today).all()
-
-    # Birthdays this month
     month = today.month
-    from app.models.teacher import Teacher as T
-    from app.models.student import Student as S
-    birthday_teachers = T.query.filter(
-        func.extract('month', T.birth_date) == month
-    ).all() if True else []
-    birthday_students = S.query.filter(
-        func.extract('month', S.birth_date) == month
-    ).all() if True else []
-    birthdays = [{'name': t.name, 'type': 'Professor', 'birth_date': t.birth_date} for t in birthday_teachers] + \
-                [{'name': s.name, 'type': 'Aluno', 'birth_date': s.birth_date} for s in birthday_students]
+    birthday_teachers = Teacher.query.filter(func.extract('month', Teacher.birth_date) == month).all()
+    birthday_students = Student.query.filter(func.extract('month', Student.birth_date) == month).all()
+    birthdays = (
+        [{'name': t.name, 'type': 'Professor', 'birth_date': t.birth_date} for t in birthday_teachers] +
+        [{'name': s.name, 'type': 'Aluno',     'birth_date': s.birth_date} for s in birthday_students]
+    )
     birthdays.sort(key=lambda x: x['birth_date'].day if x['birth_date'] else 0)
 
     return render_template('dashboard/index.html',
-        trimesters=trimesters, classes=classes,
-        trimester_id=trimester_id, filter_date=filter_date, class_id=class_id,
-        total_students=total_students, total_teachers=total_teachers,
-        total_classes=total_classes, total_lessons=total_lessons,
-        total_present=total_present, total_absent=total_absent,
-        total_visitors=total_visitors, total_offering=total_offering,
-        freq_pct=freq_pct, today_lessons=today_lessons, birthdays=birthdays
+        years=years, trimesters=trimesters, classes=classes,
+        lesson_titles=lesson_titles,
+        year=year, trimester_id=trimester_id, class_id=class_id, lesson_title=lesson_title,
+        class_stats=class_stats,
+        total_enrolled=total_enrolled, total_present=total_present,
+        total_absent=total_absent, total_visitors=total_visitors,
+        total_geral=total_geral, total_offering=total_offering,
+        total_bibles=total_bibles, total_magazines=total_magazines,
+        total_pct=total_pct,
+        chart_labels=chart_labels, chart_data=chart_data,
+        today=today, today_lessons=Lesson.query.filter_by(date=today).all(),
+        birthdays=birthdays,
+        total_students=Student.query.count(),
+        total_teachers=Teacher.query.count(),
+        total_classes=Class.query.count(),
     )

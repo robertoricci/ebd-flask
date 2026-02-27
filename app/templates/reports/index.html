@@ -3,8 +3,20 @@
 {% block content %}
 <div class="page-header"><h2>Relatórios</h2><p>Análise de frequência e resultados</p></div>
 
+<!-- Filtros -->
 <div class="card" style="margin-bottom:24px;">
   <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+
+    <!-- Ano -->
+    <div class="form-group" style="margin:0;min-width:110px;">
+      <label>Ano</label>
+      <select name="year" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for y in years %}<option value="{{ y }}" {% if year==y %}selected{% endif %}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <!-- Trimestre -->
     <div class="form-group" style="margin:0;min-width:170px;">
       <label>Trimestre</label>
       <select name="trimester_id" onchange="this.form.submit()">
@@ -12,6 +24,8 @@
         {% for t in trimesters %}<option value="{{ t.id }}" {% if trimester_id==t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
       </select>
     </div>
+
+    <!-- Turma -->
     <div class="form-group" style="margin:0;min-width:150px;">
       <label>Turma</label>
       <select name="class_id" onchange="this.form.submit()">
@@ -19,18 +33,22 @@
         {% for c in classes %}<option value="{{ c.id }}" {% if class_id==c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
       </select>
     </div>
+
+    <!-- Lição -->
     <div class="form-group" style="margin:0;min-width:200px;">
       <label>Lição</label>
       <select name="lesson_title" onchange="this.form.submit()">
-        <option value="">Todas as lições</option>
+        <option value="">Todas</option>
         {% for title in lesson_titles %}<option value="{{ title }}" {% if lesson_title==title %}selected{% endif %}>{{ title }}</option>{% endfor %}
       </select>
     </div>
-    {% if trimester_id or class_id or lesson_title %}
+
+    {% if year or trimester_id or class_id or lesson_title %}
     <a href="{{ url_for('reports.index') }}" class="btn btn-secondary btn-sm" style="margin-bottom:0;">✕ Limpar</a>
     {% endif %}
+
     <div style="margin-left:auto;">
-      <a href="{{ url_for('reports.pdf', trimester_id=trimester_id or '', class_id=class_id or '', lesson_title=lesson_title or '') }}"
+      <a href="{{ url_for('reports.pdf', year=year or '', trimester_id=trimester_id or '', class_id=class_id or '', lesson_title=lesson_title or '') }}"
          class="btn btn-primary" target="_blank">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -43,6 +61,7 @@
   </form>
 </div>
 
+<!-- Filtros ativos -->
 {% if filter_labels %}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
   {% for lbl, val in filter_labels %}
@@ -54,17 +73,12 @@
 </div>
 {% endif %}
 
-<!-- Stats -->
+<!-- Stats — Frequência por último, sem Aulas -->
 <div class="stat-grid" style="margin-bottom:24px;">
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(45,156,219,.15);color:#2d9cdb;">🎓</div>
     <div class="stat-value">{{ total_enrolled }}</div>
     <div class="stat-label">Matriculados</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-icon" style="background:rgba(245,158,11,.15);color:#f59e0b;">📚</div>
-    <div class="stat-value">{{ total_lessons }}</div>
-    <div class="stat-label">Aulas</div>
   </div>
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(16,185,129,.15);color:#10b981;">✅</div>
@@ -87,11 +101,6 @@
     <div class="stat-label">Total (P+V)</div>
   </div>
   <div class="stat-card">
-    <div class="stat-icon" style="background:rgba(45,156,219,.15);color:#2d9cdb;">📊</div>
-    <div class="stat-value" style="color:{{ total_pct | pct_color }};">{{ total_pct }}%</div>
-    <div class="stat-label">Frequência</div>
-  </div>
-  <div class="stat-card">
     <div class="stat-icon" style="background:rgba(245,158,11,.15);color:#f59e0b;">📖</div>
     <div class="stat-value" style="color:#f59e0b;">{{ total_bibles }}</div>
     <div class="stat-label">Bíblias</div>
@@ -105,6 +114,11 @@
     <div class="stat-icon" style="background:rgba(16,185,129,.15);color:#10b981;">💰</div>
     <div class="stat-value" style="font-size:1.2rem;">{{ total_offering | fmt_currency }}</div>
     <div class="stat-label">Oferta total</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(45,156,219,.15);color:#2d9cdb;">📊</div>
+    <div class="stat-value" style="color:{{ total_pct | pct_color }};">{{ total_pct }}%</div>
+    <div class="stat-label">Frequência</div>
   </div>
 </div>
 
@@ -128,15 +142,16 @@
 </div>
 {% endif %}
 
-<!-- Tabela -->
+<!-- Tabela — sem Aulas, Frequência por último -->
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Turma</th><th>Matriculados</th><th>Aulas</th><th>Presentes</th>
-          <th>Ausentes</th><th>Visitantes</th><th>Total (P+V)</th>
-          <th>Frequência</th><th>Bíblias</th><th>Revistas</th><th>Oferta</th>
+          <th>Turma</th><th>Matriculados</th>
+          <th>Presentes</th><th>Ausentes</th><th>Visitantes</th>
+          <th>Total (P+V)</th><th>Bíblias</th><th>Revistas</th>
+          <th>Oferta</th><th>Frequência</th>
         </tr>
       </thead>
       <tbody>
@@ -144,33 +159,31 @@
         <tr>
           <td><div style="font-weight:500;">{{ s.name }}</div></td>
           <td>{{ s.enrolled }}</td>
-          <td>{{ s.lessons }}</td>
           <td style="color:#10b981;font-weight:600;">{{ s.present }}</td>
           <td style="color:#ef4444;font-weight:600;">{{ s.absent }}</td>
           <td>{{ s.visitors }}</td>
           <td style="color:#2d9cdb;font-weight:600;">{{ s.total_geral }}</td>
-          <td><span class="badge {% if s.pct >= 75 %}badge-green{% elif s.pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">{{ s.pct }}%</span></td>
           <td style="color:#f59e0b;font-weight:600;">{{ s.bibles }}</td>
           <td style="color:#ef4444;font-weight:600;">{{ s.magazines }}</td>
           <td>{{ s.offering | fmt_currency }}</td>
+          <td><span class="badge {% if s.pct >= 75 %}badge-green{% elif s.pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">{{ s.pct }}%</span></td>
         </tr>
         {% endfor %}
         {% if class_stats %}
         <tr style="font-weight:700;border-top:2px solid var(--accent);">
           <td>TOTAL</td>
           <td>{{ total_enrolled }}</td>
-          <td>{{ total_lessons }}</td>
           <td style="color:#10b981;">{{ total_present }}</td>
           <td style="color:#ef4444;">{{ total_absent }}</td>
           <td>{{ total_visitors }}</td>
           <td style="color:#2d9cdb;">{{ total_geral }}</td>
-          <td><span class="badge {% if total_pct >= 75 %}badge-green{% elif total_pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">{{ total_pct }}%</span></td>
           <td style="color:#f59e0b;">{{ total_bibles }}</td>
           <td style="color:#ef4444;">{{ total_magazines }}</td>
           <td>{{ total_offering | fmt_currency }}</td>
+          <td><span class="badge {% if total_pct >= 75 %}badge-green{% elif total_pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">{{ total_pct }}%</span></td>
         </tr>
         {% else %}
-        <tr><td colspan="11" style="text-align:center;color:var(--muted);padding:32px;">Nenhum dado encontrado.</td></tr>
+        <tr><td colspan="10" style="text-align:center;color:var(--muted);padding:32px;">Nenhum dado encontrado.</td></tr>
         {% endif %}
       </tbody>
     </table>

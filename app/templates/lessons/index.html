@@ -2,6 +2,7 @@
 {% block title %}Aulas – EBD{% endblock %}
 {% block content %}
 <div class="page-header"><h2>Aulas</h2><p>Gerencie as aulas cadastradas</p></div>
+
 <div class="toolbar">
   <form method="GET" class="search-wrap">
     <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -9,20 +10,27 @@
   </form>
   <button class="btn btn-primary" onclick="openModal('createModal')">+ Nova Aula</button>
 </div>
+
 <div class="card">
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Título</th><th>Data</th><th>Turma</th><th>Status</th><th>Presença</th><th>Oferta</th><th>Ações</th></tr></thead>
+      <thead>
+        <tr><th>Título</th><th>Data</th><th>Turma</th><th>Status</th><th>Presença</th><th>Ações</th></tr>
+      </thead>
       <tbody>
         {% for l in lessons %}
         {% set att_all = l.attendances.count() %}
         {% set att_present = l.attendances.filter_by(present=True).count() %}
         {% set pct = ((att_present / att_all * 100) | round(0) | int) if att_all > 0 else 0 %}
-        <tr>
-          <td><div style="font-weight:500;">{{ l.title }}</div></td>
+        <tr id="row-{{ l.id }}">
+          <td><div style="font-weight:500;">{{ l.title }}</div>
+            {% if l.description %}<div style="font-size:.75rem;color:var(--muted);">{{ l.description[:60] }}</div>{% endif %}
+          </td>
           <td>{{ l.date | fmt_date }}</td>
           <td><span class="badge badge-blue">{{ l.klass.name }}</span></td>
-          <td><span class="badge {{ l.status | status_badge }}">{{ l.status }}</span></td>
+          <td>
+            <span class="badge {{ l.status | status_badge }}" id="badge-{{ l.id }}">{{ l.status }}</span>
+          </td>
           <td>
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="font-size:.8rem;">{{ att_present }}/{{ att_all }}</span>
@@ -34,24 +42,21 @@
               {% endif %}
             </div>
           </td>
-          <td>{{ l.offering | fmt_currency }}</td>
-          <td style="display:flex;gap:4px;">
-            <form method="POST" action="{{ url_for('lessons.advance', id=l.id) }}"><button class="btn btn-success btn-sm" title="Avançar status">↑</button></form>
-            <form method="POST" action="{{ url_for('lessons.retreat', id=l.id) }}"><button class="btn btn-secondary btn-sm" title="Retroceder">↓</button></form>
-            <button class="btn btn-secondary btn-sm" onclick="openEdit({{ l.id }}, '{{ l.title }}', '{{ l.date }}', {{ l.class_id }}, {{ l.trimester_id or 'null' }}, `{{ l.description or '' }}`, {{ l.offering }})">✏️</button>
-            <form method="POST" action="{{ url_for('lessons.delete', id=l.id) }}" onsubmit="return confirm('Remover?')">
-              <button class="btn btn-danger btn-sm">🗑️</button>
-            </form>
+          <td>
+            <button class="btn btn-secondary btn-sm" onclick="openStatusModal({{ l.id }}, '{{ l.status }}', '{{ l.title }}')">
+              ⚙️ Ações
+            </button>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">Nenhuma aula encontrada.</td></tr>
+        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;">Nenhuma aula encontrada.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
+<!-- ── Modal Criar ────────────────────────────────────────────── -->
 <div class="modal-overlay" id="createModal">
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeModal('createModal')">✕</button>
@@ -71,7 +76,6 @@
             {% for t in trimesters %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
           </select>
         </div>
-        <div class="form-group"><label>Oferta (R$)</label><input type="number" step="0.01" name="offering" value="0"></div>
         <div class="form-group" style="grid-column:1/-1"><label>Descrição</label><textarea name="description"></textarea></div>
       </div>
       <button class="btn btn-primary" type="submit" style="width:100%;">Criar</button>
@@ -79,44 +83,162 @@
   </div>
 </div>
 
+<!-- ── Modal Editar ───────────────────────────────────────────── -->
 <div class="modal-overlay" id="editModal">
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeModal('editModal')">✕</button>
     <h3>Editar Aula</h3>
     <form method="POST" id="editForm">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group" style="grid-column:1/-1"><label>Título *</label><input name="title" id="eTitle" required></div>
-        <div class="form-group"><label>Data *</label><input type="date" name="date" id="eDate" required></div>
-        <div class="form-group"><label>Turma</label>
-          <select name="class_id" id="eClass">
+        <div class="form-group" style="grid-column:1/-1"><label>Título *</label><input name="title" id="editTitle" required></div>
+        <div class="form-group"><label>Data *</label><input type="date" name="date" id="editDate" required></div>
+        <div class="form-group"><label>Turma *</label>
+          <select name="class_id" id="editClass" required>
             {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
           </select>
         </div>
         <div class="form-group"><label>Trimestre</label>
-          <select name="trimester_id" id="eTrimester">
+          <select name="trimester_id" id="editTrimester">
             <option value="">Nenhum</option>
             {% for t in trimesters %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
           </select>
         </div>
-        <div class="form-group"><label>Oferta (R$)</label><input type="number" step="0.01" name="offering" id="eOffering"></div>
-        <div class="form-group" style="grid-column:1/-1"><label>Descrição</label><textarea name="description" id="eDesc"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Descrição</label><textarea name="description" id="editDesc"></textarea></div>
       </div>
-      <button class="btn btn-primary" type="submit" style="width:100%;">Salvar</button>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button class="btn btn-primary" type="submit" style="flex:1;">Salvar</button>
+        <button type="button" class="btn btn-danger" id="deleteBtn" style="flex:0 0 auto;" onclick="confirmDelete()">🗑️ Excluir</button>
+      </div>
     </form>
+    <form method="POST" id="deleteForm" style="display:none;"></form>
   </div>
 </div>
+
+<!-- ── Modal Status (único botão de ação) ────────────────────── -->
+<div class="modal-overlay" id="statusModal">
+  <div class="modal" style="max-width:380px;">
+    <button class="modal-close" onclick="closeModal('statusModal')">✕</button>
+    <h3 id="statusModalTitle" style="margin-bottom:4px;font-size:1rem;"></h3>
+    <p id="statusModalCurrent" style="font-size:.8rem;color:var(--muted);margin-bottom:24px;"></p>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-success" id="btnLiberado" onclick="setStatus('LIBERADO')">
+        🟡 Liberar Aula
+        <span style="font-size:.75rem;display:block;font-weight:400;opacity:.8;">Disponibiliza para marcar presença</span>
+      </button>
+      <button class="btn btn-primary" id="btnFinalizado" onclick="setStatus('FINALIZADO')">
+        ✅ Finalizar Aula
+        <span style="font-size:.75rem;display:block;font-weight:400;opacity:.8;">Aula concluída e encerrada</span>
+      </button>
+      <button class="btn btn-secondary" id="btnAberto" onclick="setStatus('ABERTO')">
+        🔄 Voltar para Aberto
+        <span style="font-size:.75rem;display:block;font-weight:400;opacity:.8;">Reabre a aula para edição</span>
+      </button>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:16px;display:flex;gap:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="openEditFromStatus()" style="flex:1;">✏️ Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteFromStatus()" style="flex:1;">🗑️ Excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- form delete fora dos modais -->
+<form id="globalDeleteForm" method="POST" style="display:none;"></form>
+
 {% endblock %}
 {% block scripts %}
 <script>
-function openEdit(id, title, date, classId, trimId, desc, offering) {
+let _currentLessonId = null;
+let _currentStatus   = null;
+let _currentTitle    = null;
+
+const STATUS_LABELS = {
+  'ABERTO':     { cls: 'badge-blue',   text: 'ABERTO'     },
+  'LIBERADO':   { cls: 'badge-yellow', text: 'LIBERADO'   },
+  'FINALIZADO': { cls: 'badge-green',  text: 'FINALIZADO' },
+};
+
+function openStatusModal(id, status, title) {
+  _currentLessonId = id;
+  _currentStatus   = status;
+  _currentTitle    = title;
+
+  document.getElementById('statusModalTitle').textContent   = title;
+  document.getElementById('statusModalCurrent').textContent = 'Status atual: ' + status;
+
+  // Oculta o botão do status atual
+  document.getElementById('btnAberto').style.display    = status === 'ABERTO'     ? 'none' : '';
+  document.getElementById('btnLiberado').style.display  = status === 'LIBERADO'   ? 'none' : '';
+  document.getElementById('btnFinalizado').style.display= status === 'FINALIZADO' ? 'none' : '';
+
+  openModal('statusModal');
+}
+
+async function setStatus(newStatus) {
+  const res  = await fetch(`/aulas/${_currentLessonId}/set-status`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/x-www-form-urlencoded'},
+    body: `status=${newStatus}`
+  });
+  const data = await res.json();
+
+  // Atualiza badge na linha da tabela
+  const badge = document.getElementById(`badge-${_currentLessonId}`);
+  if (badge) {
+    const info = STATUS_LABELS[data.status];
+    badge.className = `badge ${info.cls}`;
+    badge.textContent = info.text;
+  }
+
+  closeModal('statusModal');
+}
+
+function openEdit(id, title, date, classId, trimesterId, desc) {
   document.getElementById('editForm').action = `/aulas/${id}/edit`;
-  document.getElementById('eTitle').value = title;
-  document.getElementById('eDate').value = date;
-  document.getElementById('eClass').value = classId;
-  if(trimId) document.getElementById('eTrimester').value = trimId;
-  document.getElementById('eDesc').value = desc;
-  document.getElementById('eOffering').value = offering;
+  document.getElementById('deleteForm').action = `/aulas/${id}/delete`;
+  document.getElementById('editTitle').value  = title;
+  document.getElementById('editDate').value   = date;
+  document.getElementById('editClass').value  = classId;
+  document.getElementById('editTrimester').value = trimesterId || '';
+  document.getElementById('editDesc').value   = desc;
+  closeModal('statusModal');
   openModal('editModal');
+}
+
+function openEditFromStatus() {
+  // Busca dados da linha
+  const badge = document.getElementById(`badge-${_currentLessonId}`);
+  const row   = document.getElementById(`row-${_currentLessonId}`);
+  const cells = row ? row.querySelectorAll('td') : [];
+  const title = cells[0] ? cells[0].querySelector('div').textContent.trim() : _currentTitle;
+  const date  = cells[1] ? cells[1].textContent.trim() : '';
+  // converte dd/mm/yyyy → yyyy-mm-dd
+  const parts = date.split('/');
+  const isoDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : '';
+  const classSelect = document.getElementById('editClass');
+  // abre editModal passando dados disponíveis
+  document.getElementById('editForm').action = `/aulas/${_currentLessonId}/edit`;
+  document.getElementById('deleteForm').action = `/aulas/${_currentLessonId}/delete`;
+  document.getElementById('editTitle').value = title;
+  document.getElementById('editDate').value  = isoDate;
+  document.getElementById('editDesc').value  = cells[0] && cells[0].querySelectorAll('div')[1] ? cells[0].querySelectorAll('div')[1].textContent.trim() : '';
+  closeModal('statusModal');
+  openModal('editModal');
+}
+
+function confirmDelete() {
+  if (confirm('Remover esta aula?')) {
+    document.getElementById('deleteForm').submit();
+  }
+}
+
+function deleteFromStatus() {
+  if (confirm('Remover esta aula?')) {
+    const f = document.getElementById('globalDeleteForm');
+    f.action = `/aulas/${_currentLessonId}/delete`;
+    f.submit();
+  }
 }
 </script>
 {% endblock %}

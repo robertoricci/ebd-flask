@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from app import db
 from app.models.lesson import Lesson
@@ -41,6 +41,7 @@ def create():
         class_id=class_id,
         trimester_id=request.form.get('trimester_id', type=int) or None,
         description=request.form.get('description', '').strip() or None,
+        offering=float(request.form.get('offering', 0) or 0),
         status='ABERTO'
     )
     db.session.add(lesson)
@@ -63,6 +64,7 @@ def edit(id):
     l.class_id = request.form.get('class_id', l.class_id, type=int)
     l.trimester_id = request.form.get('trimester_id', type=int) or None
     l.description = request.form.get('description', '').strip() or None
+    l.offering = float(request.form.get('offering', 0) or 0)
     db.session.commit()
     flash('Aula atualizada!', 'success')
     return redirect(url_for('lessons.index'))
@@ -77,14 +79,26 @@ def delete(id):
     flash('Aula removida.', 'success')
     return redirect(url_for('lessons.index'))
 
-@lessons_bp.route('/<int:id>/set-status', methods=['POST'])
+@lessons_bp.route('/<int:id>/advance', methods=['POST'])
 @login_required
 @admin_required
-def set_status(id):
-    """AJAX - define status diretamente."""
+def advance(id):
     l = Lesson.query.get_or_404(id)
-    new_status = request.form.get('status')
-    if new_status in STATUS_ORDER:
-        l.status = new_status
+    idx = STATUS_ORDER.index(l.status)
+    if idx < len(STATUS_ORDER) - 1:
+        l.status = STATUS_ORDER[idx + 1]
         db.session.commit()
-    return jsonify({'status': l.status})
+    flash(f'Status: {l.status}', 'success')
+    return redirect(url_for('lessons.index'))
+
+@lessons_bp.route('/<int:id>/retreat', methods=['POST'])
+@login_required
+@admin_required
+def retreat(id):
+    l = Lesson.query.get_or_404(id)
+    idx = STATUS_ORDER.index(l.status)
+    if idx > 0:
+        l.status = STATUS_ORDER[idx - 1]
+        db.session.commit()
+    flash(f'Status: {l.status}', 'success')
+    return redirect(url_for('lessons.index'))

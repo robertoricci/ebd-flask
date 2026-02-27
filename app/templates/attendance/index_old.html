@@ -1,25 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Marcar Presença – EBD{% endblock %}
 {% block content %}
-<style>
-.presence-stats {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
-}
-@media (max-width: 768px) {
-  .presence-stats {
-    grid-template-columns: 1fr;
-  }
-}
-@media (min-width: 480px) and (max-width: 768px) {
-  .presence-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-</style>
-
 <div class="page-header"><h2>Marcar Presença</h2><p>Registre a frequência dos alunos</p></div>
 
 <div class="card" style="margin-bottom:20px;">
@@ -43,7 +24,9 @@
 {% set total_count = attendances | length %}
 {% set pct = ((present_count / total_count * 100) | round(1)) if total_count > 0 else 0 %}
 
-<div class="presence-stats">
+<!-- Stats: 5 cards -->
+<div class="stat-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px;">
+
   <!-- Frequência -->
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(45,156,219,.15);color:#2d9cdb;">📊</div>
@@ -84,6 +67,7 @@
       onchange="saveField('/presenca/magazines', {{ selected_lesson.id }}, this.value)">
     <div class="stat-label" style="margin-top:4px;">Revistas</div>
   </div>
+
 </div>
 
 <!-- Actions -->
@@ -170,12 +154,14 @@ async function toggleAtt(lessonId, studentId) {
   const card   = document.getElementById(`att-${studentId}`);
   const avatar = document.getElementById(`avatar-${studentId}`);
   const status = document.getElementById(`status-${studentId}`);
-  const res    = await fetch('/presenca/toggle', {
+
+  const res  = await fetch('/presenca/toggle', {
     method: 'POST',
     headers: {'Content-Type':'application/x-www-form-urlencoded'},
     body: `lesson_id=${lessonId}&student_id=${studentId}`
   });
   const data = await res.json();
+
   if (data.present) {
     card.classList.add('present');
     card.style.borderColor = 'var(--success)';
@@ -192,6 +178,7 @@ async function toggleAtt(lessonId, studentId) {
     status.style.color = 'var(--muted)';
   }
 }
+
 async function markAll(lessonId, present) {
   await fetch('/presenca/mark-all', {
     method: 'POST',
@@ -200,6 +187,7 @@ async function markAll(lessonId, present) {
   });
   location.reload();
 }
+
 async function saveField(endpoint, lessonId, value) {
   await fetch(endpoint, {
     method: 'POST',

@@ -3,11 +3,11 @@ set -e
 
 echo "⏳ Aguardando PostgreSQL..."
 python -c "
-import time, psycopg2, os
+import time, psycopg, os
 url = os.environ['DATABASE_URL']
 for i in range(30):
     try:
-        psycopg2.connect(url)
+        psycopg.connect(url)
         print('✅ PostgreSQL pronto!')
         break
     except:
@@ -28,8 +28,8 @@ echo "⬆️ Aplicando migrações..."
 flask db upgrade 2>/tmp/migrate_err.txt || {
     echo "⚠️  Conflito de revisão detectado, resetando histórico Alembic..."
     python -c "
-import psycopg2, os
-conn = psycopg2.connect(os.environ['DATABASE_URL'])
+import psycopg, os
+conn = psycopg.connect(os.environ['DATABASE_URL'])
 cur = conn.cursor()
 cur.execute('DROP TABLE IF EXISTS alembic_version;')
 conn.commit()
