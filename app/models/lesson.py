@@ -11,6 +11,8 @@ class Lesson(db.Model):
     trimester_id = db.Column(db.Integer, db.ForeignKey('trimesters.id', ondelete='CASCADE'), nullable=True)
     description = db.Column(db.Text, nullable=True)
     offering = db.Column(db.Float, default=0.0)
+    bibles = db.Column(db.Integer, default=0)
+    magazines = db.Column(db.Integer, default=0)
     status = db.Column(db.String(20), default='ABERTO')  # ABERTO, LIBERADO, FINALIZADO
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
