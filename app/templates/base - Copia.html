@@ -285,7 +285,7 @@ select option{background:var(--card);}
     </div>
 
     {# ── Grupo Relatórios ── #}
-    {% set rel_active = request.blueprint in ('reports','birthdays','frequency') %}
+    {% set rel_active = request.blueprint in ('reports','birthdays') %}
     <div class="nav-section">Relatórios</div>
     <div class="nav-group">
       <button class="nav-group-header {% if rel_active %}open{% endif %}"
@@ -305,10 +305,6 @@ select option{background:var(--card);}
         <a href="{{ url_for('birthdays.index') }}" class="nav-sub-link {% if request.blueprint=='birthdays' %}active{% endif %}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 015 5c0 5-5 11-5 11S7 12 7 7a5 5 0 015-5z"/><circle cx="12" cy="7" r="2"/></svg>
           Aniversários
-        </a>
-        <a href="{{ url_for('frequency.index') }}" class="nav-sub-link {% if request.blueprint=='frequency' %}active{% endif %}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          Freq. de Alunos
         </a>
       </div>
     </div>

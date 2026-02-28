@@ -20,8 +20,6 @@ if [ ! -d "migrations" ]; then
     flask db init
 fi
 
-flask db migrate -m "teacher user_id" && flask db upgrade
-
 echo "🔄 Gerando migração..."
 flask db migrate -m "init" 2>/dev/null || true
 

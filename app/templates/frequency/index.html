@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% block title %}Frequência de Alunos – EBD{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2>Frequência de Alunos</h2>
+    <p>Acompanhe a presença individual de cada aluno</p>
+  </div>
+  {% if frequency %}
+  <a href="{{ url_for('frequency.pdf',
+      year=year or '', trimester_id=trimester_id or '',
+      lesson_title=lesson_title or '', class_id=class_id or '',
+      congregation_id=congregation_id or '') }}"
+     target="_blank" class="btn btn-primary">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+    </svg>
+    Gerar PDF
+  </a>
+  {% endif %}
+</div>
+
+<!-- ── Filtros ──────────────────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+  <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+
+    <div class="form-group" style="margin:0;min-width:100px;">
+      <label>Ano</label>
+      <select name="year" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for y in years %}<option value="{{ y }}" {% if year==y %}selected{% endif %}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group" style="margin:0;min-width:175px;">
+      <label>Trimestre</label>
+      <select name="trimester_id" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for t in (trimesters if year else all_trimesters) %}
+        <option value="{{ t.id }}" {% if trimester_id==t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {% if congregations %}
+    <div class="form-group" style="margin:0;min-width:175px;">
+      <label>Congregação</label>
+      <select name="congregation_id" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for cg in congregations %}
+        <option value="{{ cg.id }}" {% if congregation_id==cg.id %}selected{% endif %}>{{ cg.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="form-group" style="margin:0;min-width:155px;">
+      <label>Turma</label>
+      <select name="class_id" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for c in classes %}
+        <option value="{{ c.id }}" {% if class_id==c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group" style="margin:0;min-width:175px;">
+      <label>Lição</label>
+      <select name="lesson_title" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for t in lesson_titles %}
+        <option value="{{ t }}" {% if lesson_title==t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {% if year or trimester_id or class_id or congregation_id or lesson_title %}
+    <a href="{{ url_for('frequency.index') }}" class="btn btn-secondary btn-sm" style="margin-bottom:0;">✕ Limpar</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- ── Chips de filtros ativos ─────────────────────────────────────────── -->
+{% set has_filter = year or trimester_id or class_id or congregation_id or lesson_title %}
+{% if has_filter %}
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+  {% if year %}
+  <span style="padding:4px 12px;background:rgba(45,156,219,.15);border:1px solid rgba(45,156,219,.3);border-radius:999px;font-size:.75rem;color:var(--accent);">
+    📅 {{ year }}
+  </span>{% endif %}
+  {% if trimester_id %}{% for t in all_trimesters %}{% if t.id==trimester_id %}
+  <span style="padding:4px 12px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:999px;font-size:.75rem;color:#8b5cf6;">
+    🗓️ {{ t.name }}
+  </span>{% endif %}{% endfor %}{% endif %}
+  {% if congregation_id %}{% for cg in congregations %}{% if cg.id==congregation_id %}
+  <span style="padding:4px 12px;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);border-radius:999px;font-size:.75rem;color:var(--success);">
+    🏛️ {{ cg.name }}
+  </span>{% endif %}{% endfor %}{% endif %}
+  {% if class_id %}{% for c in classes %}{% if c.id==class_id %}
+  <span style="padding:4px 12px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);border-radius:999px;font-size:.75rem;color:var(--warning);">
+    📚 {{ c.name }}
+  </span>{% endif %}{% endfor %}{% endif %}
+  {% if lesson_title %}
+  <span style="padding:4px 12px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:999px;font-size:.75rem;color:var(--danger);">
+    📖 {{ lesson_title }}
+  </span>{% endif %}
+</div>
+{% endif %}
+
+<!-- ── Resultado ────────────────────────────────────────────────────────── -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+  <span style="color:var(--muted);font-size:.82rem;">
+    {{ frequency | length }} aluno(s) encontrado(s)
+    {% if frequency %}· ordenado por maior frequência{% endif %}
+  </span>
+  {% if frequency %}
+  <div style="display:flex;gap:8px;font-size:.75rem;">
+    <span style="padding:3px 10px;background:rgba(16,185,129,.15);border-radius:999px;color:var(--success);">
+      🟢 ≥75%
+    </span>
+    <span style="padding:3px 10px;background:rgba(245,158,11,.15);border-radius:999px;color:var(--warning);">
+      🟡 50–74%
+    </span>
+    <span style="padding:3px 10px;background:rgba(239,68,68,.15);border-radius:999px;color:var(--danger);">
+      🔴 &lt;50%
+    </span>
+  </div>
+  {% endif %}
+</div>
+
+{% if frequency %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:32px;">#</th>
+          <th>Nome</th>
+          <th>Turma(s)</th>
+          <th>Telefone</th>
+          <th>Email</th>
+          <th style="text-align:center;">Presenças</th>
+          <th style="text-align:center;">Total</th>
+          <th style="min-width:120px;">Frequência</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in frequency %}
+        {% set pct = r.pct %}
+        {% if pct >= 75 %}
+          {% set pct_color = 'var(--success)' %}
+          {% set badge_cls = 'badge-green' %}
+        {% elif pct >= 50 %}
+          {% set pct_color = 'var(--warning)' %}
+          {% set badge_cls = 'badge-yellow' %}
+        {% else %}
+          {% set pct_color = 'var(--danger)' %}
+          {% set badge_cls = 'badge-red' %}
+        {% endif %}
+        <tr>
+          <td style="color:var(--muted);font-size:.8rem;text-align:center;">{{ loop.index }}</td>
+          <td>
+            <div style="font-weight:600;">{{ r.name }}</div>
+          </td>
+          <td>
+            <span class="badge badge-blue" style="font-size:.72rem;">{{ r.classes }}</span>
+          </td>
+          <td style="color:var(--muted);font-size:.82rem;">{{ r.phone }}</td>
+          <td style="color:var(--muted);font-size:.82rem;">{{ r.email }}</td>
+          <td style="text-align:center;">
+            <span style="font-weight:700;color:var(--success);font-size:1rem;">{{ r.presences }}</span>
+          </td>
+          <td style="text-align:center;color:var(--muted);">{{ r.total }}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;min-width:50px;">
+                <div style="height:100%;width:{{ pct }}%;background:{{ pct_color }};border-radius:4px;transition:.4s;"></div>
+              </div>
+              <span class="badge {{ badge_cls }}" style="font-size:.7rem;min-width:42px;justify-content:center;">
+                {{ pct }}%
+              </span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% elif has_filter %}
+<div class="card" style="text-align:center;padding:48px;">
+  <div style="font-size:2.5rem;margin-bottom:12px;">📭</div>
+  <p style="color:var(--muted);">Nenhum aluno encontrado para os filtros selecionados.</p>
+</div>
+
+{% else %}
+<div class="card" style="text-align:center;padding:48px;">
+  <div style="font-size:2.5rem;margin-bottom:12px;">📊</div>
+  <p style="color:var(--muted);">Selecione os filtros acima para visualizar a frequência dos alunos.</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -44,11 +44,10 @@ def create_app():
     from app.controllers.visitors import visitors_bp
     from app.controllers.reports import reports_bp
     from app.controllers.birthdays import birthdays_bp
-    from app.controllers.frequency import frequency_bp
 
     for bp in [auth_bp, dashboard_bp, churches_bp, users_bp, teachers_bp,
                students_bp, classes_bp, trimesters_bp, lessons_bp,
-               attendance_bp, visitors_bp, reports_bp, birthdays_bp, frequency_bp]:
+               attendance_bp, visitors_bp, reports_bp, birthdays_bp]:
         app.register_blueprint(bp)
 
     from app import template_filters

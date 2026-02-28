@@ -8,35 +8,32 @@
   </div>
   <a href="{{ url_for('reports.membros_pdf') }}" target="_blank" class="btn btn-secondary">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
       <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
     </svg>
     📋 Relatório de Membros
   </a>
 </div>
 
-<!-- ── Filtros ─────────────────────────────────────────────────────────── -->
-<div class="card" style="margin-bottom:20px;">
+<div class="card" style="margin-bottom:24px;">
   <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-
-    <div class="form-group" style="margin:0;min-width:100px;">
+    <div class="form-group" style="margin:0;min-width:110px;">
       <label>Ano</label>
       <select name="year" onchange="this.form.submit()">
         <option value="">Todos</option>
         {% for y in years %}<option value="{{ y }}" {% if year==y %}selected{% endif %}>{{ y }}</option>{% endfor %}
       </select>
     </div>
-
-    <div class="form-group" style="margin:0;min-width:175px;">
+    <div class="form-group" style="margin:0;min-width:170px;">
       <label>Trimestre</label>
       <select name="trimester_id" onchange="this.form.submit()">
         <option value="">Todos</option>
         {% for t in trimesters %}<option value="{{ t.id }}" {% if trimester_id==t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
       </select>
     </div>
-
     {% if congregations %}
-    <div class="form-group" style="margin:0;min-width:175px;">
+    <div class="form-group" style="margin:0;min-width:180px;">
       <label>Congregação</label>
       <select name="congregation_id" onchange="this.form.submit()">
         <option value="">Todas</option>
@@ -44,36 +41,25 @@
       </select>
     </div>
     {% endif %}
-
-    <!-- Lição ANTES da Turma — somente finalizadas -->
-    <div class="form-group" style="margin:0;min-width:185px;">
-      <label>
-        Lição <span style="font-size:.68rem;color:var(--warning);margin-left:4px;">● somente fechadas</span>
-      </label>
-      <select name="lesson_title" onchange="this.form.submit()">
-        <option value="">— Selecione uma lição —</option>
-        {% for title in lesson_titles %}<option value="{{ title }}" {% if lesson_title==title %}selected{% endif %}>{{ title }}</option>{% endfor %}
-      </select>
-    </div>
-
-    <!-- Turma DEPOIS da Lição -->
-    <div class="form-group" style="margin:0;min-width:155px;">
+    <div class="form-group" style="margin:0;min-width:150px;">
       <label>Turma</label>
       <select name="class_id" onchange="this.form.submit()">
         <option value="">Todas</option>
         {% for c in classes %}<option value="{{ c.id }}" {% if class_id==c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
       </select>
     </div>
-
+    <div class="form-group" style="margin:0;min-width:200px;">
+      <label>Lição</label>
+      <select name="lesson_title" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for title in lesson_titles %}<option value="{{ title }}" {% if lesson_title==title %}selected{% endif %}>{{ title }}</option>{% endfor %}
+      </select>
+    </div>
     {% if year or trimester_id or class_id or congregation_id or lesson_title %}
     <a href="{{ url_for('reports.index') }}" class="btn btn-secondary btn-sm" style="margin-bottom:0;">✕ Limpar</a>
     {% endif %}
-
-    {% if lesson_title %}
     <div style="margin-left:auto;">
-      <a href="{{ url_for('reports.pdf', year=year or '', trimester_id=trimester_id or '',
-                  class_id=class_id or '', congregation_id=congregation_id or '',
-                  lesson_title=lesson_title or '') }}"
+      <a href="{{ url_for('reports.pdf', year=year or '', trimester_id=trimester_id or '', class_id=class_id or '', congregation_id=congregation_id or '', lesson_title=lesson_title or '') }}"
          class="btn btn-primary" target="_blank">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -83,35 +69,20 @@
         Gerar PDF
       </a>
     </div>
-    {% endif %}
   </form>
 </div>
 
-<!-- ── Chips de filtros ativos ─────────────────────────────────────────── -->
 {% if filter_labels %}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
   {% for lbl, val in filter_labels %}
-  <div style="padding:4px 12px;background:var(--hover);border:1px solid var(--border);border-radius:999px;font-size:.78rem;">
+  <div style="padding:5px 12px;background:var(--hover);border:1px solid var(--border);border-radius:999px;font-size:.78rem;">
     <span style="color:var(--muted);">{{ lbl }}:</span>
-    <span style="font-weight:600;color:var(--accent);"> {{ val }}</span>
+    <span style="font-weight:600;color:var(--accent);">{{ val }}</span>
   </div>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- ── Aviso quando nenhuma lição selecionada ──────────────────────────── -->
-{% if not lesson_title %}
-<div class="card" style="text-align:center;padding:48px 24px;">
-  <div style="font-size:2.5rem;margin-bottom:12px;">📖</div>
-  <p style="font-weight:600;margin-bottom:6px;">Selecione uma lição para ver os dados</p>
-  <p style="color:var(--muted);font-size:.875rem;">
-    O filtro de <strong>Lição</strong> é obrigatório. Apenas lições com status <span style="color:var(--success);">Finalizado</span> aparecem na lista.
-  </p>
-</div>
-
-{% else %}
-
-<!-- ── Cards de resumo ─────────────────────────────────────────────────── -->
 <div class="stat-grid" style="margin-bottom:24px;">
   <div class="stat-card"><div class="stat-icon" style="background:rgba(45,156,219,.15);color:#2d9cdb;">🎓</div><div class="stat-value">{{ total_enrolled }}</div><div class="stat-label">Matriculados</div></div>
   <div class="stat-card"><div class="stat-icon" style="background:rgba(16,185,129,.15);color:#10b981;">✅</div><div class="stat-value" style="color:#10b981;">{{ total_present }}</div><div class="stat-label">Presenças</div></div>
@@ -125,16 +96,13 @@
 </div>
 
 {% if class_stats %}
-<!-- ── Barras de progresso ─────────────────────────────────────────────── -->
 <div class="card" style="margin-bottom:24px;">
   <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;margin-bottom:20px;">Frequência por Turma</h3>
   <div style="display:flex;flex-direction:column;gap:14px;">
     {% for s in class_stats %}
     <div>
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-        <span style="font-size:.875rem;font-weight:500;">{{ s.name }}
-          {% if show_congregation_col %}<span style="font-size:.72rem;color:var(--muted);"> · {{ s.congregation }}</span>{% endif %}
-        </span>
+        <span style="font-size:.875rem;font-weight:500;">{{ s.name }}{% if show_congregation_col %} <span style="font-size:.72rem;color:var(--muted);">· {{ s.congregation }}</span>{% endif %}</span>
         <span class="badge {% if s.pct >= 75 %}badge-green{% elif s.pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">{{ s.pct }}%</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:{{ s.pct }}%;background:{{ s.pct | pct_color }};"></div></div>
@@ -143,8 +111,7 @@
   </div>
 </div>
 
-<!-- ── Tabela de frequência ───────────────────────────────────────────── -->
-<div class="card" style="margin-bottom:24px;">
+<div class="card">
   <div class="table-wrap">
     <table>
       <thead>
@@ -176,8 +143,7 @@
           <td>TOTAL</td><td>{{ total_enrolled }}</td>
           <td style="color:#10b981;">{{ total_present }}</td>
           <td style="color:#ef4444;">{{ total_absent }}</td>
-          <td>{{ total_visitors }}</td>
-          <td style="color:#2d9cdb;">{{ total_geral }}</td>
+          <td>{{ total_visitors }}</td><td style="color:#2d9cdb;">{{ total_geral }}</td>
           <td style="color:#f59e0b;">{{ total_bibles }}</td>
           <td style="color:#ef4444;">{{ total_magazines }}</td>
           <td>{{ total_offering | fmt_currency }}</td>
@@ -187,44 +153,7 @@
     </table>
   </div>
 </div>
-
-<!-- ── Visitantes da lição ────────────────────────────────────────────── -->
-{% if visitors_list %}
-<div class="card">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;">👥 Visitantes</h3>
-    <span class="badge badge-purple">{{ visitors_list | length }}</span>
-    <span style="color:var(--muted);font-size:.8rem;">· lição: {{ lesson_title }}</span>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>Nome</th><th>Telefone</th><th>Igreja de Origem</th><th>Observações</th></tr>
-      </thead>
-      <tbody>
-        {% for v in visitors_list %}
-        <tr>
-          <td style="font-weight:500;">{{ v.name }}</td>
-          <td style="color:var(--muted);font-size:.82rem;">{{ v.phone or '—' }}</td>
-          <td style="color:var(--muted);font-size:.82rem;">{{ v.church or '—' }}</td>
-          <td style="color:var(--muted);font-size:.8rem;">{{ v.notes or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% elif total_visitors == 0 %}
-<div class="card" style="text-align:center;padding:28px;">
-  <p style="color:var(--muted);font-size:.875rem;">👥 Nenhum visitante registrado nesta lição.</p>
-</div>
-{% endif %}
-
 {% else %}
-<div class="card" style="text-align:center;padding:48px;">
-  <p style="color:var(--muted);">Nenhum dado encontrado para os filtros selecionados.</p>
-</div>
+<div class="card" style="text-align:center;padding:48px;"><p style="color:var(--muted);">Nenhum dado encontrado para os filtros selecionados.</p></div>
 {% endif %}
-
-{% endif %}{# end lesson_title #}
 {% endblock %}

@@ -1,0 +1,373 @@
+{% extends 'base.html' %}
+{% block title %}Aulas – EBD{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Aulas</h2><p>Gerencie as aulas cadastradas</p></div>
+
+<!-- ── Filtros ──────────────────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:16px;">
+  <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div style="position:relative;flex:1;min-width:160px;">
+      <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" name="q" placeholder="Buscar aula..." value="{{ search }}" style="width:100%;padding-left:32px;">
+    </div>
+    <div class="form-group" style="margin:0;min-width:100px;">
+      <label>Ano</label>
+      <select name="year" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for y in years %}<option value="{{ y }}" {% if year==y %}selected{% endif %}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin:0;min-width:170px;">
+      <label>Trimestre</label>
+      <select name="trimester_id" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for t in (trimesters if year else all_trimesters) %}
+        <option value="{{ t.id }}" {% if trimester_id==t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if year or trimester_id or search %}
+    <a href="{{ url_for('lessons.index') }}" class="btn btn-secondary btn-sm" style="margin-bottom:0;">✕ Limpar</a>
+    {% endif %}
+    <div style="margin-left:auto;">
+      <button class="btn btn-primary" type="button" onclick="openModal('createModal')">+ Nova Aula</button>
+    </div>
+  </form>
+</div>
+
+<div style="color:var(--muted);font-size:.8rem;margin-bottom:10px;">
+  {{ lessons | length }} aula(s) encontrada(s)
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Título</th><th>Data</th><th>Turma</th><th>Professor</th><th>Status</th><th>Presença</th><th>Ações</th></tr>
+      </thead>
+      <tbody>
+        {% for l in lessons %}
+        {% set att_all     = l.attendances.count() %}
+        {% set att_present = l.attendances.filter_by(present=True).count() %}
+        {% set pct = ((att_present / att_all * 100) | round(0) | int) if att_all > 0 else 0 %}
+        <tr id="row-{{ l.id }}">
+          <td>
+            <div style="font-weight:500;">{{ l.title }}</div>
+            {% if l.description %}<div style="font-size:.75rem;color:var(--muted);">{{ l.description[:50] }}</div>{% endif %}
+          </td>
+          <td>{{ l.date | fmt_date }}</td>
+          <td><span class="badge badge-blue">{{ l.klass.name }}</span></td>
+          <td style="font-size:.82rem;color:var(--muted);">
+            {% if l.teacher %}{{ l.teacher.name }}{% else %}—{% endif %}
+          </td>
+          <td><span class="badge {{ l.status | status_badge }}" id="badge-{{ l.id }}">{{ l.status }}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:.8rem;">{{ att_present }}/{{ att_all }}</span>
+              {% if att_all > 0 %}
+              <div class="progress-bar" style="width:60px;">
+                <div class="progress-fill" style="width:{{ pct }}%;background:{{ pct | pct_color }};"></div>
+              </div>
+              <span style="font-size:.75rem;color:var(--muted);">{{ pct }}%</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <button class="btn btn-secondary btn-sm"
+              onclick="openStatusModal({{ l.id }}, '{{ l.status }}', '{{ l.title | e }}')">
+              ⚙️ Ações
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">Nenhuma aula encontrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     Modal Criar
+═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+    <h3>Nova Aula</h3>
+    <form method="POST" action="{{ url_for('lessons.create') }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="grid-column:1/-1"><label>Título *</label><input name="title" required></div>
+        <div class="form-group"><label>Data *</label><input type="date" name="date" required></div>
+        <div class="form-group"><label>Turma *</label>
+          <select name="class_id" required>
+            {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label>Trimestre</label>
+          <select name="trimester_id">
+            <option value="">Nenhum</option>
+            {% for t in all_trimesters %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label>Professor</label>
+          <select name="teacher_id">
+            <option value="">— Sem professor —</option>
+            {% for t in teachers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1"><label>Descrição</label><textarea name="description"></textarea></div>
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Criar</button>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     Modal Editar — sem Trimestre e Turma; com Professor e Alunos Extras
+═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal modal-lg" style="max-width:620px;">
+    <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+    <h3 id="editModalTitle">Editar Aula</h3>
+
+    <!-- Tag mostrando a turma (read-only) -->
+    <div id="editClassBadge" style="margin-bottom:16px;"></div>
+
+    <form method="POST" id="editForm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Título *</label>
+          <input name="title" id="editTitle" required>
+        </div>
+
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" name="date" id="editDate" required>
+        </div>
+
+        <div class="form-group">
+          <label>Professor</label>
+          <select name="teacher_id" id="editTeacher">
+            <option value="">— Sem professor —</option>
+            {% for t in teachers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Descrição</label>
+          <textarea name="description" id="editDesc"></textarea>
+        </div>
+
+      </div>
+
+      <!-- ── Alunos Extras ───────────────────────────────────────────── -->
+      <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div>
+            <div style="font-weight:600;font-size:.9rem;">👨‍🎓 Alunos desta Aula</div>
+            <div style="font-size:.75rem;color:var(--muted);margin-top:2px;">
+              Alunos da turma já incluídos automaticamente. Adicione extras abaixo.
+            </div>
+          </div>
+          <span id="extraCountBadge" class="badge badge-blue" style="font-size:.72rem;"></span>
+        </div>
+
+        <!-- Busca de alunos -->
+        <div style="position:relative;margin-bottom:10px;">
+          <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="studentSearch" placeholder="Buscar aluno para adicionar..."
+            style="width:100%;padding-left:32px;font-size:.85rem;" oninput="filterStudents()">
+        </div>
+
+        <!-- Lista com checkboxes -->
+        <div id="studentList"
+          style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;
+                 scrollbar-width:thin;scrollbar-color:var(--border) transparent;">
+          {% for s in students %}
+          <label id="srow-{{ s.id }}"
+            style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+                   border-radius:8px;cursor:pointer;transition:.15s;font-size:.85rem;"
+            onmouseover="this.style.background='var(--hover)'"
+            onmouseout="this.style.background=this.querySelector('input').checked?'rgba(45,156,219,.08)':''">
+            <input type="checkbox" name="extra_student_ids" value="{{ s.id }}"
+              style="accent-color:var(--accent);width:16px;height:16px;flex-shrink:0;"
+              onchange="updateExtraCount()">
+            <span class="s-name">{{ s.name }}</span>
+            <span style="margin-left:auto;font-size:.72rem;color:var(--muted);">
+              {% for c in s.classes %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        <div id="noStudentMsg" style="display:none;text-align:center;padding:12px;color:var(--muted);font-size:.82rem;">
+          Nenhum aluno encontrado.
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" type="submit" style="flex:1;">✅ Salvar</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete()">🗑️ Excluir</button>
+      </div>
+    </form>
+    <form method="POST" id="deleteForm" style="display:none;"></form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     Modal Status
+═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="statusModal">
+  <div class="modal" style="max-width:380px;">
+    <button class="modal-close" onclick="closeModal('statusModal')">✕</button>
+    <h3 id="statusModalTitle" style="margin-bottom:4px;font-size:1rem;"></h3>
+    <p id="statusModalCurrent" style="font-size:.8rem;color:var(--muted);margin-bottom:24px;"></p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-success" id="btnLiberado" onclick="setStatus('LIBERADO')">
+        🟡 Liberar Aula
+        <span style="font-size:.75rem;display:block;font-weight:400;opacity:.8;">Disponibiliza para marcar presença</span>
+      </button>
+      <button class="btn btn-primary" id="btnFinalizado" onclick="setStatus('FINALIZADO')">
+        ✅ Finalizar Aula
+        <span style="font-size:.75rem;display:block;font-weight:400;opacity:.8;">Aula concluída e encerrada</span>
+      </button>
+      <button class="btn btn-secondary" id="btnAberto" onclick="setStatus('ABERTO')">
+        🔄 Voltar para Aberto
+        <span style="font-size:.75rem;display:block;font-weight:400;opacity:.8;">Reabre a aula para edição</span>
+      </button>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:16px;display:flex;gap:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="openEditFromStatus()" style="flex:1;">✏️ Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteFromStatus()" style="flex:1;">🗑️ Excluir</button>
+    </div>
+  </div>
+</div>
+
+<form id="globalDeleteForm" method="POST" style="display:none;"></form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _lid = null, _lStatus = null, _lTitle = null;
+const STATUS_LABELS = {
+  'ABERTO':     { cls: 'badge-blue',   text: 'ABERTO'     },
+  'LIBERADO':   { cls: 'badge-yellow', text: 'LIBERADO'   },
+  'FINALIZADO': { cls: 'badge-green',  text: 'FINALIZADO' },
+};
+
+/* ── Status modal ─────────────────────────────────────────────────── */
+function openStatusModal(id, status, title) {
+  _lid = id; _lStatus = status; _lTitle = title;
+  document.getElementById('statusModalTitle').textContent   = title;
+  document.getElementById('statusModalCurrent').textContent = 'Status atual: ' + status;
+  document.getElementById('btnAberto').style.display     = status === 'ABERTO'     ? 'none' : '';
+  document.getElementById('btnLiberado').style.display   = status === 'LIBERADO'   ? 'none' : '';
+  document.getElementById('btnFinalizado').style.display = status === 'FINALIZADO' ? 'none' : '';
+  openModal('statusModal');
+}
+
+async function setStatus(newStatus) {
+  const res  = await fetch(`/aulas/${_lid}/set-status`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: `status=${newStatus}`
+  });
+  const data = await res.json();
+  const badge = document.getElementById(`badge-${_lid}`);
+  if (badge) {
+    const info = STATUS_LABELS[data.status];
+    badge.className   = `badge ${info.cls}`;
+    badge.textContent = info.text;
+  }
+  closeModal('statusModal');
+}
+
+/* ── Edit modal — carrega via AJAX ────────────────────────────────── */
+async function openEditFromStatus() {
+  closeModal('statusModal');
+  await openEditModal(_lid);
+}
+
+async function openEditModal(id) {
+  _lid = id;
+  const res  = await fetch(`/aulas/${id}/data`);
+  const data = await res.json();
+
+  document.getElementById('editForm').action   = `/aulas/${id}/edit`;
+  document.getElementById('deleteForm').action = `/aulas/${id}/delete`;
+  document.getElementById('editTitle').value   = data.title;
+  document.getElementById('editDate').value    = data.date;
+  document.getElementById('editDesc').value    = data.description;
+
+  // Professor
+  const tSel = document.getElementById('editTeacher');
+  tSel.value = data.teacher_id || '';
+
+  // Badge da turma (read-only)
+  document.getElementById('editClassBadge').innerHTML =
+    `<span style="display:inline-flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);">
+       Turma:&nbsp;<span class="badge badge-blue">${data.class_name}</span>
+     </span>`;
+
+  // Alunos extras — reset + marcar os salvos
+  document.querySelectorAll('#studentList input[type=checkbox]').forEach(cb => {
+    cb.checked = data.extra_ids.includes(parseInt(cb.value));
+    const lbl = cb.closest('label');
+    lbl.style.background = cb.checked ? 'rgba(45,156,219,.08)' : '';
+  });
+  updateExtraCount();
+  document.getElementById('studentSearch').value = '';
+  filterStudents();
+
+  openModal('editModal');
+}
+
+/* ── Busca de alunos no modal ─────────────────────────────────────── */
+function filterStudents() {
+  const q   = document.getElementById('studentSearch').value.toLowerCase();
+  const rows = document.querySelectorAll('#studentList label');
+  let visible = 0;
+  rows.forEach(row => {
+    const name = row.querySelector('.s-name').textContent.toLowerCase();
+    const show = name.includes(q);
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('noStudentMsg').style.display = visible === 0 ? '' : 'none';
+}
+
+function updateExtraCount() {
+  const checked = document.querySelectorAll('#studentList input:checked').length;
+  const badge   = document.getElementById('extraCountBadge');
+  badge.textContent = checked > 0 ? `${checked} extra(s) selecionado(s)` : 'Nenhum extra';
+  badge.className   = checked > 0 ? 'badge badge-blue' : 'badge badge-gray';
+  // Destacar linhas marcadas
+  document.querySelectorAll('#studentList input[type=checkbox]').forEach(cb => {
+    cb.closest('label').style.background = cb.checked ? 'rgba(45,156,219,.08)' : '';
+  });
+}
+
+/* ── Botão Editar na tabela (via status modal → edit) ─────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  // Adiciona handler nos botões ⚙️ da tabela para guardar _lid
+  document.querySelectorAll('[id^="row-"]').forEach(row => {
+    const id = row.id.replace('row-', '');
+    const btn = row.querySelector('.btn-secondary');
+    if (btn) btn.dataset.lessonId = id;
+  });
+});
+
+/* ── Excluir ──────────────────────────────────────────────────────── */
+function confirmDelete() {
+  if (confirm('Remover esta aula?')) document.getElementById('deleteForm').submit();
+}
+
+function deleteFromStatus() {
+  if (confirm('Remover esta aula?')) {
+    const f = document.getElementById('globalDeleteForm');
+    f.action = `/aulas/${_lid}/delete`;
+    f.submit();
+  }
+}
+</script>
+{% endblock %}

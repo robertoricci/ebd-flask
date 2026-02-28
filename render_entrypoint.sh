@@ -5,6 +5,7 @@ echo "Inicializando migrações..."
 if [ ! -d "migrations" ]; then
     flask db init
 fi
+flask db migrate -m "lesson teacher_id and lesson_students"
 
 echo "Gerando migração..."
 flask db migrate -m "init" 2>/dev/null || true
