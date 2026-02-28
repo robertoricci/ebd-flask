@@ -15,6 +15,7 @@ class Student(db.Model):
     phone           = db.Column(db.String(30),  nullable=True)
     birth_date      = db.Column(db.Date,        nullable=True)
     notes           = db.Column(db.Text,        nullable=True)
+    active          = db.Column(db.Boolean, default=True, nullable=False)
     congregation_id = db.Column(db.Integer, db.ForeignKey('congregations.id', ondelete='SET NULL'), nullable=True)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 

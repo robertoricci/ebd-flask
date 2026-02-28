@@ -20,6 +20,7 @@ if [ ! -d "migrations" ]; then
     flask db init
 fi
 
+
 echo "🔄 Gerando migração..."
 flask db migrate -m "init" 2>/dev/null || true
 

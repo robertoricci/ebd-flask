@@ -2,8 +2,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app import db
 from app.models.student import Student
-from app.models.attendance import Attendance
-from app.models.lesson import Lesson
 from app.models.church import Congregation
 from app.utils.decorators import admin_required
 from app.utils.scope import scoped
@@ -16,6 +14,18 @@ def parse_date(s):
     try: return datetime.strptime(s, '%Y-%m-%d').date()
     except: return None
 
+@students_bp.route('/')
+@login_required
+@admin_required
+def index():
+    search = request.args.get('q', '')
+    q = scoped(Student)
+    if search:
+        q = q.filter(Student.name.ilike(f'%{search}%'))
+    students = q.order_by(Student.name).all()
+    congregations = _visible_congregations()
+    return render_template('students/index.html', students=students, search=search, congregations=congregations)
+
 def _visible_congregations():
     if current_user.is_superadmin:
         return Congregation.query.order_by(Congregation.name).all()
@@ -24,26 +34,6 @@ def _visible_congregations():
     if current_user.congregation_id:
         return Congregation.query.filter_by(id=current_user.congregation_id).all()
     return []
-
-def _has_attendance(student_id):
-    """Verifica se o aluno tem registros de presença em alguma lição."""
-    return Attendance.query.filter_by(student_id=student_id).first() is not None
-
-@students_bp.route('/')
-@login_required
-@admin_required
-def index():
-    search     = request.args.get('q', '')
-    show_all   = request.args.get('show_all', '0') == '1'
-    q = scoped(Student)
-    if search:
-        q = q.filter(Student.name.ilike(f'%{search}%'))
-    if not show_all:
-        q = q.filter(Student.active == True)
-    students      = q.order_by(Student.name).all()
-    congregations = _visible_congregations()
-    return render_template('students/index.html', students=students, search=search,
-                           congregations=congregations, show_all=show_all)
 
 @students_bp.route('/create', methods=['POST'])
 @login_required
@@ -59,7 +49,6 @@ def create():
         birth_date=parse_date(request.form.get('birth_date')),
         notes=request.form.get('notes', '').strip() or None,
         congregation_id=congregation_id,
-        active=True,
     )
     db.session.add(s); db.session.commit()
     flash('Aluno criado!', 'success')
@@ -70,11 +59,11 @@ def create():
 @admin_required
 def edit(id):
     s = Student.query.get_or_404(id)
-    s.name       = request.form.get('name', s.name).strip()
-    s.email      = request.form.get('email', '').strip() or None
-    s.phone      = request.form.get('phone', '').strip() or None
+    s.name = request.form.get('name', s.name).strip()
+    s.email = request.form.get('email', '').strip() or None
+    s.phone = request.form.get('phone', '').strip() or None
     s.birth_date = parse_date(request.form.get('birth_date'))
-    s.notes      = request.form.get('notes', '').strip() or None
+    s.notes = request.form.get('notes', '').strip() or None
     if current_user.is_superadmin or current_user.is_church_admin:
         s.congregation_id = request.form.get('congregation_id', type=int) or s.congregation_id
     db.session.commit()
@@ -86,20 +75,6 @@ def edit(id):
 @admin_required
 def delete(id):
     s = Student.query.get_or_404(id)
-    if _has_attendance(s.id):
-        flash(f'❌ "{s.name}" possui registros de presença e não pode ser excluído. Use a opção Inativar.', 'danger')
-        return redirect(url_for('students.index'))
     db.session.delete(s); db.session.commit()
     flash('Aluno removido.', 'success')
-    return redirect(url_for('students.index'))
-
-@students_bp.route('/<int:id>/toggle-active', methods=['POST'])
-@login_required
-@admin_required
-def toggle_active(id):
-    s = Student.query.get_or_404(id)
-    s.active = not s.active
-    db.session.commit()
-    status = 'ativado' if s.active else 'inativado'
-    flash(f'Aluno "{s.name}" {status}.', 'success')
     return redirect(url_for('students.index'))

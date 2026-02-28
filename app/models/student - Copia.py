@@ -1,24 +1,22 @@
 from app import db
 from datetime import datetime
 
-class_teachers = db.Table('class_teachers',
+class_students = db.Table('class_students',
     db.Column('class_id',   db.Integer, db.ForeignKey('classes.id',   ondelete='CASCADE'), primary_key=True),
-    db.Column('teacher_id', db.Integer, db.ForeignKey('teachers.id',  ondelete='CASCADE'), primary_key=True)
+    db.Column('student_id', db.Integer, db.ForeignKey('students.id',  ondelete='CASCADE'), primary_key=True)
 )
 
-class Teacher(db.Model):
-    __tablename__ = 'teachers'
+class Student(db.Model):
+    __tablename__ = 'students'
 
     id              = db.Column(db.Integer, primary_key=True)
-    user_id         = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True, unique=True)
     name            = db.Column(db.String(150), nullable=False)
     email           = db.Column(db.String(150), nullable=True)
     phone           = db.Column(db.String(30),  nullable=True)
     birth_date      = db.Column(db.Date,        nullable=True)
     notes           = db.Column(db.Text,        nullable=True)
-    active          = db.Column(db.Boolean, default=True, nullable=False)
     congregation_id = db.Column(db.Integer, db.ForeignKey('congregations.id', ondelete='SET NULL'), nullable=True)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
     congregation = db.relationship('Congregation', foreign_keys=[congregation_id], lazy='joined')
-    user         = db.relationship('User', foreign_keys=[user_id], lazy='joined')
+    attendances  = db.relationship('Attendance', backref='student', cascade='all, delete-orphan', lazy='dynamic')

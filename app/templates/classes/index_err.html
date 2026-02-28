@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block title %}Professores – EBD{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Professores</h2><p>Gerencie os professores cadastrados</p></div>
+<div class="toolbar">
+  <form method="GET" class="search-wrap">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" name="q" placeholder="Buscar professor..." value="{{ search }}">
+  </form>
+  <button class="btn btn-primary" onclick="openModal('createModal')">+ Vincular Professor</button>
+</div>
+
+{% if available_users | length == 0 and not search %}
+<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:.875rem;color:#f59e0b;display:flex;align-items:center;gap:10px;">
+  <span style="font-size:1.2rem;">⚠️</span>
+  <div>
+    <strong>Nenhum usuário do tipo Professor disponível.</strong><br>
+    <span style="color:var(--muted);font-size:.8rem;">Cadastre primeiro um usuário com perfil <strong style="color:var(--text);">Professor</strong> no menu Usuários, depois volte aqui para vinculá-lo.</span>
+  </div>
+  <a href="{{ url_for('users.index') }}" class="btn btn-secondary btn-sm" style="margin-left:auto;white-space:nowrap;">Ir para Usuários</a>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Nascimento</th>
+        {% if current_user.is_superadmin or current_user.is_church_admin %}<th>Congregação</th>{% endif %}
+        <th>Ações</th></tr>
+      </thead>
+      <tbody>
+        {% for t in teachers %}
+        <tr style="{% if not t.active %}opacity:.55;{% endif %}">
+          <td>
+            <div style="font-weight:500;">{{ t.name }}</div>
+            {% if t.user %}<div style="font-size:.7rem;color:var(--accent);">👤 {{ t.user.role }}</div>{% endif %}
+          </td>
+          <td style="font-size:.8rem;color:var(--muted);">{{ t.email or '—' }}</td>
+          <td>{{ t.phone or '—' }}</td>
+          <td>{{ t.birth_date | fmt_date if t.birth_date else '—' }}</td>
+          {% if current_user.is_superadmin or current_user.is_church_admin %}
+          <td><span class="badge badge-blue" style="font-size:.72rem;">{{ t.congregation.name if t.congregation else '—' }}</span></td>
+          {% endif %}
+          <td style="display:flex;gap:4px;">
+            <button class="btn btn-secondary btn-sm"
+              onclick="openEdit({{ t.id }}, '{{ t.phone or '' }}', '{{ t.birth_date or '' }}', `{{ t.notes or '' }}`, {{ t.congregation_id or 'null' }})">✏️</button>
+            <!-- Inativar/Ativar -->
+            <form method="POST" action="{{ url_for('teachers.toggle_active', id=t.id) }}">
+              <button class="btn btn-sm"
+                style="{% if t.active %}background:rgba(245,158,11,.15);color:var(--warning);border:1px solid rgba(245,158,11,.3);{% else %}background:rgba(16,185,129,.15);color:var(--success);border:1px solid rgba(16,185,129,.3);{% endif %}"
+                title="{{ 'Inativar' if t.active else 'Ativar' }}">
+                {{ '🔕' if t.active else '✅' }}
+              </button>
+            </form>
+            <form method="POST" action="{{ url_for('teachers.delete', id=t.id) }}" onsubmit="return confirm('Remover professor?')">
+              <button class="btn btn-danger btn-sm">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">Nenhum professor cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Vincular Professor -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+    <h3>Vincular Professor</h3>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:20px;">
+      Selecione um usuário cadastrado com perfil <strong style="color:var(--text);">Professor</strong> para vinculá-lo como professor da congregação.
+    </p>
+
+    {% if available_users %}
+    <form method="POST" action="{{ url_for('teachers.create') }}">
+      <div class="form-group">
+        <label>Usuário (Professor) *</label>
+        <select name="user_id" required id="userSelect" onchange="fillFromUser(this)">
+          <option value="">— Selecione um usuário —</option>
+          {% for u in available_users %}
+          <option value="{{ u.id }}" data-email="{{ u.email }}" data-name="{{ u.name }}">
+            {{ u.name }} — {{ u.email }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="background:var(--hover);border-radius:8px;padding:12px;margin-bottom:16px;font-size:.8rem;color:var(--muted);" id="userPreview" style="display:none;">
+        <strong style="color:var(--text);">Dados do usuário selecionado:</strong>
+        <div id="previewName" style="margin-top:4px;"></div>
+        <div id="previewEmail"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Telefone</label><input name="phone" id="cPhone"></div>
+        <div class="form-group"><label>Data de Nascimento</label><input type="date" name="birth_date" id="cBirth"></div>
+        {% if current_user.is_superadmin or current_user.is_church_admin %}
+        <div class="form-group"><label>Congregação</label>
+          <select name="congregation_id" id="cCong">
+            <option value="">— Selecione —</option>
+            {% for cg in congregations %}<option value="{{ cg.id }}">{{ cg.name }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+      <div class="form-group"><label>Observações</label><textarea name="notes" id="cNotes"></textarea></div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">✅ Vincular Professor</button>
+    </form>
+    {% else %}
+    <div style="text-align:center;padding:24px;color:var(--muted);">
+      <div style="font-size:2rem;margin-bottom:8px;">👤</div>
+      <p>Nenhum usuário do tipo <strong>Professor</strong> disponível para vincular.</p>
+      <a href="{{ url_for('users.index') }}" class="btn btn-primary" style="margin-top:12px;">Cadastrar Usuário</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal Editar -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+    <h3>Editar Professor</h3>
+    <form method="POST" id="editForm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Telefone</label><input name="phone" id="ePhone"></div>
+        <div class="form-group"><label>Data de Nascimento</label><input type="date" name="birth_date" id="eBirth"></div>
+        {% if current_user.is_superadmin or current_user.is_church_admin %}
+        <div class="form-group"><label>Congregação</label>
+          <select name="congregation_id" id="eCong">
+            <option value="">— Selecione —</option>
+            {% for cg in congregations %}<option value="{{ cg.id }}">{{ cg.name }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+      <div class="form-group"><label>Observações</label><textarea name="notes" id="eNotes"></textarea></div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Salvar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fillFromUser(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const preview = document.getElementById('userPreview');
+  if (opt.value) {
+    preview.style.display = 'block';
+    document.getElementById('previewName').textContent  = '👤 ' + opt.dataset.name;
+    document.getElementById('previewEmail').textContent = '✉️ ' + opt.dataset.email;
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+function openEdit(id, phone, birth, notes, congId) {
+  document.getElementById('editForm').action = `/professores/${id}/edit`;
+  document.getElementById('ePhone').value = phone;
+  document.getElementById('eBirth').value = birth;
+  document.getElementById('eNotes').value = notes;
+  const ec = document.getElementById('eCong');
+  if (ec && congId) ec.value = congId;
+  openModal('editModal');
+}
+</script>
+{% endblock %}

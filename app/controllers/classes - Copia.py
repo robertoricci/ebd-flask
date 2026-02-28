@@ -75,11 +75,9 @@ def members(id):
     all_teachers = Teacher.query.filter(Teacher.congregation_id.in_(ids)).order_by(Teacher.name).all()
     member_students = [s.id for s in c.students]
     member_teachers = [t.id for t in c.teachers]
-    from datetime import date
     return render_template('classes/members.html', klass=c,
         all_students=all_students, all_teachers=all_teachers,
-        member_students=member_students, member_teachers=member_teachers,
-        today_date=date.today())
+        member_students=member_students, member_teachers=member_teachers)
 
 @classes_bp.route('/<int:id>/members/update', methods=['POST'])
 @login_required
