@@ -1,25 +1,52 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard – EBD{% endblock %}
+
 {% block content %}
 <div class="page-header"><h2>Dashboard</h2><p>Visão geral da EBD</p></div>
 
 <!-- ── Filtros ──────────────────────────────────────────────────────────── -->
-<div class="card" style="margin-bottom:24px;">
-  <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-    <div class="form-group" style="margin:0;min-width:110px;">
+<div class="card" style="margin-bottom:20px;">
+  <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+
+    {# Congregação (superadmin / church_admin — ANTES do Ano) #}
+    {% if show_cong_filter %}
+    <div class="form-group" style="margin:0;min-width:170px;">
+      <label>Congregação</label>
+      <select name="congregation_id" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for cg in congregations %}
+        <option value="{{ cg.id }}" {% if congregation_id==cg.id %}selected{% endif %}>{{ cg.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="form-group" style="margin:0;min-width:100px;">
       <label>Ano</label>
       <select name="year" onchange="this.form.submit()">
         <option value="">Todos</option>
         {% for y in years %}<option value="{{ y }}" {% if year==y %}selected{% endif %}>{{ y }}</option>{% endfor %}
       </select>
     </div>
-    <div class="form-group" style="margin:0;min-width:170px;">
+
+    <div class="form-group" style="margin:0;min-width:165px;">
       <label>Trimestre</label>
       <select name="trimester_id" onchange="this.form.submit()">
         <option value="">Todos</option>
         {% for t in trimesters %}<option value="{{ t.id }}" {% if trimester_id==t.id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
       </select>
     </div>
+
+    {# Lição ANTES da Turma #}
+    <div class="form-group" style="margin:0;min-width:175px;">
+      <label>Lição</label>
+      <select name="lesson_title" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for title in lesson_titles %}<option value="{{ title }}" {% if lesson_title==title %}selected{% endif %}>{{ title }}</option>{% endfor %}
+      </select>
+    </div>
+
+    {# Turma (respeita congregação do usuário) #}
     <div class="form-group" style="margin:0;min-width:150px;">
       <label>Turma</label>
       <select name="class_id" onchange="this.form.submit()">
@@ -27,25 +54,19 @@
         {% for c in classes %}<option value="{{ c.id }}" {% if class_id==c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
       </select>
     </div>
-    <div class="form-group" style="margin:0;min-width:200px;">
-      <label>Lição</label>
-      <select name="lesson_title" onchange="this.form.submit()">
-        <option value="">Todas</option>
-        {% for title in lesson_titles %}<option value="{{ title }}" {% if lesson_title==title %}selected{% endif %}>{{ title }}</option>{% endfor %}
-      </select>
-    </div>
-    {% if year or trimester_id or class_id or lesson_title %}
+
+    {% if congregation_id or year or trimester_id or class_id or lesson_title %}
     <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary btn-sm" style="margin-bottom:0;">✕ Limpar</a>
     {% endif %}
   </form>
 </div>
 
-<!-- ── Totais gerais (cadastros) ─────────────────────────────────────────── -->
-<div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px;">
+<!-- ── Cards cadastros (responsivos) ─────────────────────────────────────── -->
+<div class="stat-grid dash-top-cards" style="margin-bottom:20px;">
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(45,156,219,.15);color:#2d9cdb;">👨‍🎓</div>
     <div class="stat-value">{{ total_students }}</div>
-    <div class="stat-label">Alunos cadastrados</div>
+    <div class="stat-label">Alunos</div>
   </div>
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(139,92,246,.15);color:#8b5cf6;">👨‍🏫</div>
@@ -59,9 +80,9 @@
   </div>
 </div>
 
-<!-- ── Stats do filtro (igual ao relatório) ──────────────────────────────── -->
+<!-- ── Cards frequência (responsivos) ────────────────────────────────────── -->
 {% if class_stats %}
-<div class="stat-grid" style="margin-bottom:24px;">
+<div class="stat-grid dash-freq-cards" style="margin-bottom:20px;">
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(45,156,219,.15);color:#2d9cdb;">🎓</div>
     <div class="stat-value">{{ total_enrolled }}</div>
@@ -99,7 +120,7 @@
   </div>
   <div class="stat-card">
     <div class="stat-icon" style="background:rgba(16,185,129,.15);color:#10b981;">💰</div>
-    <div class="stat-value" style="font-size:1.2rem;">{{ total_offering | fmt_currency }}</div>
+    <div class="stat-value offering-value" style="font-size:1.1rem;">{{ total_offering | fmt_currency }}</div>
     <div class="stat-label">Oferta total</div>
   </div>
   <div class="stat-card">
@@ -109,20 +130,20 @@
   </div>
 </div>
 
-<!-- ── Gráfico de Frequência ─────────────────────────────────────────────── -->
+<!-- ── Gráfico ────────────────────────────────────────────────────────────── -->
 {% if chart_labels %}
-<div class="card" style="margin-bottom:24px;">
+<div class="card" style="margin-bottom:20px;">
   <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;margin-bottom:20px;">
     📈 Frequência ao longo do tempo
   </h3>
-  <div style="position:relative;height:260px;">
+  <div style="position:relative;height:240px;">
     <canvas id="freqChart"></canvas>
   </div>
 </div>
 {% endif %}
 
-<!-- ── Frequência por Turma (barras) ─────────────────────────────────────── -->
-<div class="card" style="margin-bottom:24px;">
+<!-- ── Barras por turma ───────────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
   <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;margin-bottom:20px;">Frequência por Turma</h3>
   <div style="display:flex;flex-direction:column;gap:14px;">
     {% for s in class_stats %}
@@ -139,15 +160,15 @@
   </div>
 </div>
 
-<!-- ── Tabela por turma ───────────────────────────────────────────────────── -->
-<div class="card" style="margin-bottom:24px;">
+<!-- ── Tabela ─────────────────────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>Turma</th><th>Matriculados</th><th>Presentes</th><th>Ausentes</th>
-          <th>Visitantes</th><th>Total (P+V)</th><th>Bíblias</th><th>Revistas</th>
-          <th>Oferta</th><th>Frequência</th>
+          <th>Visitantes</th><th>Total P+V</th><th>Bíblias</th><th>Revistas</th>
+          <th>Oferta</th><th>Freq.</th>
         </tr>
       </thead>
       <tbody>
@@ -181,14 +202,15 @@
     </table>
   </div>
 </div>
+
 {% else %}
-<div class="card" style="text-align:center;padding:48px;margin-bottom:24px;">
-  <p style="color:var(--muted);">Selecione um filtro para ver os dados.</p>
+<div class="card" style="text-align:center;padding:40px;margin-bottom:20px;">
+  <p style="color:var(--muted);">Selecione um filtro para ver os dados de frequência.</p>
 </div>
 {% endif %}
 
 <!-- ── Aulas de hoje + Aniversariantes ───────────────────────────────────── -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+<div class="dash-bottom-grid">
   <div class="card">
     <h3 style="font-family:'Playfair Display',serif;font-size:1rem;margin-bottom:16px;">📅 Aulas de Hoje</h3>
     {% if today_lessons %}
@@ -234,30 +256,80 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+/* ── Cards responsivos ── */
+.stat-grid { display: grid; gap: 12px; }
+.dash-top-cards   { grid-template-columns: repeat(3, 1fr); }
+.dash-freq-cards  { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
+.dash-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+
+/* Tablet */
+@media (max-width: 900px) {
+  .dash-top-cards  { grid-template-columns: repeat(3, 1fr); }
+  .dash-freq-cards { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .dash-top-cards   { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .dash-freq-cards  { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .dash-bottom-grid { grid-template-columns: 1fr; gap: 12px; }
+
+  /* Card compacto: ícone menor, layout mais denso */
+  .stat-card {
+    padding: 12px 10px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .stat-value {
+    font-size: 1.25rem;
+    line-height: 1.1;
+  }
+  .stat-label {
+    font-size: 10px;
+    margin-top: 2px;
+  }
+}
+
+/* Mobile pequeno */
+@media (max-width: 380px) {
+  .dash-top-cards  { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .dash-freq-cards { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .stat-card  { padding: 10px 8px; gap: 8px; }
+  .stat-icon  { width: 30px; height: 30px; font-size: .85rem; }
+  .stat-value { font-size: 1.1rem; }
+  .stat-label { font-size: 9px; }
+  .offering-value { font-size: .85rem !important; }
+}
+</style>
+
 {% if chart_labels %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const labels = {{ chart_labels | tojson }};
-const data   = {{ chart_data | tojson }};
-
-const ctx = document.getElementById('freqChart').getContext('2d');
-
-// Gradiente de preenchimento
-const gradient = ctx.createLinearGradient(0, 0, 0, 260);
-gradient.addColorStop(0,   'rgba(45,156,219,0.35)');
-gradient.addColorStop(1,   'rgba(45,156,219,0.00)');
-
+const data   = {{ chart_data   | tojson }};
+const ctx    = document.getElementById('freqChart').getContext('2d');
+const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+gradient.addColorStop(0, 'rgba(45,156,219,0.35)');
+gradient.addColorStop(1, 'rgba(45,156,219,0.00)');
 new Chart(ctx, {
   type: 'line',
   data: {
-    labels: labels,
+    labels,
     datasets: [{
       label: 'Frequência (%)',
-      data: data,
+      data,
       borderColor: '#2d9cdb',
       backgroundColor: gradient,
       borderWidth: 2.5,
-      pointBackgroundColor: data.map(v => v >= 75 ? '#10b981' : v >= 50 ? '#f59e0b' : '#ef4444'),
+      pointBackgroundColor: data.map(v => v>=75?'#10b981':v>=50?'#f59e0b':'#ef4444'),
       pointBorderColor: '#151d2e',
       pointBorderWidth: 2,
       pointRadius: 5,
@@ -277,24 +349,13 @@ new Chart(ctx, {
         borderWidth: 1,
         titleColor: '#94a3b8',
         bodyColor: '#fff',
-        callbacks: {
-          label: ctx => ` ${ctx.parsed.y}%`
-        }
+        callbacks: { label: ctx => ` ${ctx.parsed.y}%` }
       }
     },
     scales: {
-      x: {
-        grid:  { color: 'rgba(30,45,68,0.8)' },
-        ticks: { color: '#64748b', font: { size: 11 } },
-      },
-      y: {
-        min: 0, max: 100,
-        grid:  { color: 'rgba(30,45,68,0.8)' },
-        ticks: {
-          color: '#64748b', font: { size: 11 },
-          callback: v => v + '%'
-        }
-      }
+      x: { grid: { color: 'rgba(30,45,68,0.8)' }, ticks: { color: '#64748b', font: { size: 11 } } },
+      y: { min: 0, max: 100, grid: { color: 'rgba(30,45,68,0.8)' },
+           ticks: { color: '#64748b', font: { size: 11 }, callback: v => v+'%' } }
     }
   }
 });

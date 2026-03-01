@@ -103,12 +103,3 @@ def toggle_active(id):
     status = 'ativado' if s.active else 'inativado'
     flash(f'Aluno "{s.name}" {status}.', 'success')
     return redirect(url_for('students.index'))
-
-@students_bp.route('/<int:id>/can-delete')
-@login_required
-@admin_required
-def can_delete(id):
-    from flask import jsonify
-    s = Student.query.get_or_404(id)
-    has_att = _has_attendance(s.id)
-    return jsonify({'has_records': has_att, 'active': s.active, 'name': s.name})

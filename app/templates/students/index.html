@@ -2,44 +2,123 @@
 {% block title %}Alunos – EBD{% endblock %}
 {% block content %}
 <div class="page-header"><h2>Alunos</h2><p>Gerencie os alunos cadastrados</p></div>
+
 <div class="toolbar">
-  <form method="GET" class="search-wrap">
-    <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" name="q" placeholder="Buscar aluno..." value="{{ search }}">
-  </form>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <form method="GET" class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" name="q" placeholder="Buscar aluno..." value="{{ search }}">
+      {% if show_all %}<input type="hidden" name="show_all" value="1">{% endif %}
+    </form>
+    <a href="{{ url_for('students.index', q=search, show_all=0 if show_all else 1) }}" class="btn btn-secondary btn-sm">
+      {% if show_all %}👁️ Ocultar inativos{% else %}👁️ Ver inativos{% endif %}
+    </a>
+  </div>
   <button class="btn btn-primary" onclick="openModal('createModal')">+ Novo Aluno</button>
 </div>
+
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nome</th><th>Telefone</th><th>Nascimento</th>
-        {% if current_user.is_superadmin or current_user.is_church_admin %}<th>Congregação</th>{% endif %}
-        <th>Ações</th></tr>
+        <tr>
+          <th>Nome</th><th>Telefone</th><th>Nascimento</th>
+          {% if current_user.is_superadmin or current_user.is_church_admin %}<th>Congregação</th>{% endif %}
+          <th>Status</th><th>Ações</th>
+        </tr>
       </thead>
       <tbody>
         {% for s in students %}
-        <tr>
-          <td><div style="font-weight:500;">{{ s.name }}</div>{% if s.email %}<div style="font-size:.72rem;color:var(--muted);">{{ s.email }}</div>{% endif %}</td>
+        <tr style="{% if not s.active %}opacity:.55;{% endif %}">
+          <td>
+            <div style="font-weight:500;">{{ s.name }}</div>
+            {% if s.email %}<div style="font-size:.72rem;color:var(--muted);">{{ s.email }}</div>{% endif %}
+          </td>
           <td>{{ s.phone or '—' }}</td>
           <td>{{ s.birth_date | fmt_date if s.birth_date else '—' }}</td>
           {% if current_user.is_superadmin or current_user.is_church_admin %}
           <td><span class="badge badge-blue" style="font-size:.72rem;">{{ s.congregation.name if s.congregation else '—' }}</span></td>
           {% endif %}
+          <td>
+            {% if s.active %}<span class="badge badge-green">Ativo</span>
+            {% else %}<span class="badge badge-gray">Inativo</span>{% endif %}
+          </td>
           <td style="display:flex;gap:4px;">
-            <button class="btn btn-secondary btn-sm" onclick="openEdit({{ s.id }}, '{{ s.name }}', '{{ s.email or '' }}', '{{ s.phone or '' }}', '{{ s.birth_date or '' }}', `{{ s.notes or '' }}`, {{ s.congregation_id or 'null' }})">✏️</button>
-            <form method="POST" action="{{ url_for('students.delete', id=s.id) }}" onsubmit="return confirm('Remover?')">
-              <button class="btn btn-danger btn-sm">🗑️</button>
-            </form>
+            <button class="btn btn-secondary btn-sm"
+              onclick="openEdit({{ s.id }}, '{{ s.name | e }}', '{{ s.email or '' }}', '{{ s.phone or '' }}', '{{ s.birth_date or '' }}', `{{ s.notes or '' }}`, {{ s.congregation_id or 'null' }})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="openDeleteModal({{ s.id }}, '{{ s.name | e }}', {{ 'true' if s.active else 'false' }}, 'student')" title="Excluir">🗑️</button>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;">Nenhum aluno encontrado.</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">Nenhum aluno encontrado.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- ── Modal Excluir / Inativar ────────────────────────────────────────── -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal" style="max-width:420px;">
+    <button class="modal-close" onclick="closeModal('deleteModal')">✕</button>
+
+    <!-- Estado: carregando -->
+    <div id="deleteLoading" style="text-align:center;padding:32px;">
+      <div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>
+      <p style="color:var(--muted);">Verificando...</p>
+    </div>
+
+    <!-- Estado: pode excluir (sem aulas) -->
+    <div id="deleteCanDelete" style="display:none;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:2.5rem;margin-bottom:12px;">🗑️</div>
+        <h3 style="margin-bottom:6px;">Excluir aluno?</h3>
+        <p style="color:var(--muted);font-size:.875rem;">
+          Tem certeza que deseja excluir <strong id="deleteNameA"></strong>?<br>
+          Esta ação não pode ser desfeita.
+        </p>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('deleteModal')">Cancelar</button>
+        <form id="deleteFormA" method="POST" style="flex:1;">
+          <button class="btn btn-danger" style="width:100%;">🗑️ Excluir</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Estado: tem aulas → só inativar -->
+    <div id="deleteHasRecords" style="display:none;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:2.5rem;margin-bottom:12px;">⚠️</div>
+        <h3 style="margin-bottom:6px;">Não é possível excluir</h3>
+        <p style="color:var(--muted);font-size:.875rem;">
+          <strong id="deleteNameB"></strong> possui registros de presença em aulas e não pode ser excluído.
+        </p>
+        <p style="font-size:.82rem;color:var(--muted);margin-top:8px;">
+          Você pode <strong>inativar</strong> o aluno — ele não aparecerá nas listagens, mas o histórico será preservado.
+        </p>
+      </div>
+      <!-- Mostra opção de inativar só se estiver ativo -->
+      <div id="inativateWrap" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('deleteModal')">Cancelar</button>
+        <form id="toggleFormA" method="POST" style="flex:1;">
+          <button class="btn btn-warning" style="width:100%;background:rgba(245,158,11,.15);color:var(--warning);border:1px solid rgba(245,158,11,.4);">
+            🔕 Inativar aluno
+          </button>
+        </form>
+      </div>
+      <!-- Já inativo: só cancelar -->
+      <div id="alreadyInactiveWrap" style="display:none;">
+        <p style="text-align:center;font-size:.82rem;color:var(--success);margin-bottom:12px;">✅ Este aluno já está inativo.</p>
+        <button class="btn btn-secondary" style="width:100%;" onclick="closeModal('deleteModal')">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Forms ocultos -->
+<form id="hiddenDeleteA"  method="POST" style="display:none;"></form>
+<form id="hiddenToggleA"  method="POST" style="display:none;"></form>
 
 {% macro student_fields(prefix='') %}
 <div class="form-group"><label>Nome *</label><input name="name" id="{{ prefix }}Name" required></div>
@@ -81,6 +160,7 @@
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
 function openEdit(id, name, email, phone, birth, notes, congId) {
@@ -91,8 +171,41 @@ function openEdit(id, name, email, phone, birth, notes, congId) {
   document.getElementById('eBirth').value = birth;
   document.getElementById('eNotes').value = notes;
   const ec = document.getElementById('eCong');
-  if (ec && congId) ec.value = congId;
+  if (ec) ec.value = congId || '';
   openModal('editModal');
+}
+
+async function openDeleteModal(id, name, isActive, type) {
+  // Mostra loading
+  document.getElementById('deleteLoading').style.display    = '';
+  document.getElementById('deleteCanDelete').style.display  = 'none';
+  document.getElementById('deleteHasRecords').style.display = 'none';
+  openModal('deleteModal');
+
+  const res  = await fetch(`/alunos/${id}/can-delete`);
+  const data = await res.json();
+
+  document.getElementById('deleteLoading').style.display = 'none';
+
+  if (!data.has_records) {
+    // Pode excluir
+    document.getElementById('deleteNameA').textContent = data.name;
+    document.getElementById('deleteFormA').action      = `/alunos/${id}/delete`;
+    document.getElementById('deleteCanDelete').style.display = '';
+  } else {
+    // Tem registros — mostrar inativar
+    document.getElementById('deleteNameB').textContent = data.name;
+    document.getElementById('deleteHasRecords').style.display = '';
+
+    if (data.active) {
+      document.getElementById('toggleFormA').action         = `/alunos/${id}/toggle-active`;
+      document.getElementById('inativateWrap').style.display    = '';
+      document.getElementById('alreadyInactiveWrap').style.display = 'none';
+    } else {
+      document.getElementById('inativateWrap').style.display    = 'none';
+      document.getElementById('alreadyInactiveWrap').style.display = '';
+    }
+  }
 }
 </script>
 {% endblock %}
