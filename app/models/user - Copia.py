@@ -4,11 +4,10 @@ import bcrypt
 from datetime import datetime
 
 # Roles:
-#   SUPERADMIN   → acesso total, gerencia igrejas e congregações
+#   SUPERADMIN  → acesso total, gerencia igrejas e congregações
 #   CHURCH_ADMIN → gerencia todas as congregações de uma igreja
-#   ADMIN        → gerencia sua congregação
-#   TEACHER      → acessa presença da sua congregação
-#   SECRETARY    → acessa somente aniversários e presença da turma vinculada
+#   ADMIN       → gerencia sua congregação
+#   TEACHER     → acessa presença da sua congregação
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -21,12 +20,10 @@ class User(UserMixin, db.Model):
     active          = db.Column(db.Boolean, default=True)
     church_id       = db.Column(db.Integer, db.ForeignKey('churches.id',       ondelete='SET NULL'), nullable=True)
     congregation_id = db.Column(db.Integer, db.ForeignKey('congregations.id',  ondelete='SET NULL'), nullable=True)
-    class_id        = db.Column(db.Integer, db.ForeignKey('classes.id',          ondelete='SET NULL'), nullable=True)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
 
     church       = db.relationship('Church',       foreign_keys=[church_id],       lazy='joined')
     congregation = db.relationship('Congregation', foreign_keys=[congregation_id], lazy='joined')
-    klass        = db.relationship('Class',        foreign_keys=[class_id],        lazy='select')
 
     def set_password(self, password):
         self.password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -43,21 +40,12 @@ class User(UserMixin, db.Model):
         return self.role == 'CHURCH_ADMIN'
 
     @property
-    def is_secretary(self):
-        return self.role == 'SECRETARY'
-
-    @property
     def is_admin(self):
         return self.role in ('SUPERADMIN', 'CHURCH_ADMIN', 'ADMIN')
 
     @property
     def is_congregation_admin(self):
         return self.role == 'ADMIN'
-
-    @property
-    def is_limited(self):
-        """TEACHER ou SECRETARY — sem acesso admin."""
-        return self.role in ('TEACHER', 'SECRETARY')
 
     def can_see_congregation(self, congregation_id):
         if self.is_superadmin:

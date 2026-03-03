@@ -1,39 +1,129 @@
 {% extends 'base.html' %}
 {% block title %}Aniversários – EBD{% endblock %}
 {% block content %}
-<div class="page-header"><h2>Aniversários</h2><p>Aniversariantes do mês</p></div>
 
+<div class="page-header">
+  <div>
+    <h2>Aniversários</h2>
+    <p>
+      {% if current_user.is_secretary or current_user.role == 'TEACHER' %}
+        {% if current_user.klass %}Turma: <strong>{{ current_user.klass.name }}</strong>{% else %}Sua turma{% endif %}
+      {% elif current_user.is_congregation_admin %}
+        {{ congregations[0].name if congregations else 'Sua congregação' }}
+      {% else %}Aniversariantes do mês{% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- ── Filtros ─────────────────────────────────────────────────────────── -->
 <div class="card" style="margin-bottom:20px;">
-  <form method="GET">
-    <div class="form-group" style="margin:0;max-width:200px;">
+  <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div class="form-group" style="margin:0;min-width:180px;">
       <label>Mês</label>
-      <select name="month" onchange="this.form.submit()">
-        {% for i, m in enumerate(months, 1) %}
-        <option value="{{ i }}" {% if month == i %}selected{% endif %}>{{ m }}</option>
+      <select name="mes" onchange="this.form.submit()">
+        <option value="todos" {% if mes_param == 'todos' %}selected{% endif %}>Todos os meses</option>
+        {% for i in range(1, 13) %}
+        <option value="{{ i }}" {% if mes_param == i|string %}selected{% endif %}>{{ MESES[i-1] }}</option>
         {% endfor %}
       </select>
+    </div>
+    {% if mes_param != 'todos' %}
+    <a href="{{ url_for('birthdays.index') }}?mes=todos" class="btn btn-secondary btn-sm" style="margin-bottom:0;">✕ Ver todos</a>
+    {% endif %}
+    <div style="margin-left:auto;">
+      <a href="{{ url_for('birthdays.pdf', mes=mes_param) }}" target="_blank" class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        Gerar PDF
+      </a>
     </div>
   </form>
 </div>
 
-{% if people %}
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
-  {% for p in people %}
-  <div class="card" style="{% if p.is_today %}border-color:#f59e0b;{% endif %}padding:16px;display:flex;align-items:center;gap:14px;">
-    <div style="font-size:2rem;">{{ '👨‍🏫' if p.type == 'Professor' else '🎓' }}</div>
-    <div style="flex:1;">
-      <div style="font-weight:600;font-size:.9rem;">{{ p.name }}</div>
-      <div style="color:var(--muted);font-size:.75rem;">{{ p.birth_date | fmt_date }} · {{ p.age }} anos</div>
-      <span class="badge {% if p.type == 'Professor' %}badge-purple{% else %}badge-blue{% endif %}" style="margin-top:4px;">{{ p.type }}</span>
-    </div>
-    {% if p.is_today %}<span style="font-size:1.5rem;">🎉</span>{% endif %}
-  </div>
-  {% endfor %}
+<!-- ── Cabeçalho resultado ─────────────────────────────────────────────── -->
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+  <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;margin:0;">
+    🎂 {% if mes_param == 'todos' %}Todos os meses{% else %}{{ MESES[mes_param|int - 1] }}{% endif %}
+  </h3>
+  <span class="badge badge-blue">{{ birthday_list | length }} pessoa{{ 's' if birthday_list | length != 1 else '' }}</span>
 </div>
+
+<!-- ── Tabela ──────────────────────────────────────────────────────────── -->
+{% if birthday_list %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Data de Aniversário</th>
+          <th>Idade</th>
+          <th>Tipo</th>
+          <th>Turma</th>
+          <th>Telefone</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set ns = namespace(cur_month=-1) %}
+        {% for b in birthday_list %}
+
+          {# Linha separadora de mês (somente quando "todos") #}
+          {% if mes_param == 'todos' and b.birth_date %}
+            {% set bm = b.birth_date.month %}
+            {% if bm != ns.cur_month %}
+              {% set ns.cur_month = bm %}
+              <tr>
+                <td colspan="7"
+                    style="background:var(--hover);padding:8px 14px;font-size:.75rem;
+                           font-weight:700;color:var(--accent);letter-spacing:.06em;
+                           text-transform:uppercase;border-top:2px solid var(--border);">
+                  🗓 {{ MESES[bm-1] }}
+                </td>
+              </tr>
+            {% endif %}
+          {% endif %}
+
+          <tr {% if b.birth_date and b.birth_date.day == today.day and b.birth_date.month == today.month %}
+                style="outline:1px solid #ec4899;"
+              {% endif %}>
+            <td style="font-weight:500;">
+              {% if b.birth_date and b.birth_date.day == today.day and b.birth_date.month == today.month %}
+                🎉
+              {% endif %}
+              {{ b.name }}
+            </td>
+            <td>{{ b.birth_date.strftime('%d/%m/%Y') if b.birth_date else '—' }}</td>
+            <td style="color:var(--warning);font-weight:600;">{{ b.age or '—' }}</td>
+            <td>
+              <span class="badge {% if b.type == 'Professor' %}badge-purple{% else %}badge-blue{% endif %}">
+                {{ b.type }}
+              </span>
+            </td>
+            <td style="font-size:.82rem;color:var(--muted);">{{ b.turma }}</td>
+            <td style="font-size:.82rem;color:var(--muted);">{{ b.telefone }}</td>
+            <td style="font-size:.82rem;color:var(--muted);">{{ b.email }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {% else %}
-<div class="card" style="text-align:center;padding:48px;">
-  <p style="font-size:2rem;margin-bottom:12px;">🎂</p>
-  <p style="color:var(--muted);">Nenhum aniversariante em {{ months[month-1] }}.</p>
+<div class="card" style="text-align:center;padding:48px 24px;">
+  <div style="font-size:2.5rem;margin-bottom:12px;">🎂</div>
+  <p style="font-weight:600;margin-bottom:6px;">
+    {% if mes_param == 'todos' %}Nenhum aniversariante cadastrado
+    {% else %}Nenhum aniversariante em {{ MESES[mes_param|int - 1] }}{% endif %}
+  </p>
+  <p style="color:var(--muted);font-size:.875rem;">
+    Verifique se as datas de nascimento estão preenchidas nos cadastros.
+  </p>
 </div>
 {% endif %}
+
 {% endblock %}

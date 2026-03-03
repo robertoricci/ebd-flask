@@ -209,12 +209,14 @@ select option{background:var(--card);}
 
   <nav class="sidebar-nav" id="sidebarNav">
 
-    {# ── Dashboard ── #}
+    {# ── Dashboard (não visível para secretário) ── #}
+    {% if not current_user.is_secretary %}
     <div class="nav-section">Principal</div>
     <a href="{{ url_for('dashboard.index') }}" class="nav-link {% if request.blueprint=='dashboard' %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       Dashboard
     </a>
+    {% endif %}
 
     {# ── Sistema (superadmin) ── #}
     {% if current_user.is_superadmin %}
@@ -222,6 +224,19 @@ select option{background:var(--card);}
     <a href="{{ url_for('churches.index') }}" class="nav-link {% if request.blueprint=='churches' %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       Igrejas
+    </a>
+    {% endif %}
+
+    {# ── Menu SECRETÁRIO ── #}
+    {% if current_user.is_secretary %}
+    <div class="nav-section">Secretário</div>
+    <a href="{{ url_for('birthdays.index') }}" class="nav-link {% if request.blueprint=='birthdays' %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 015 5c0 5-5 11-5 11S7 12 7 7a5 5 0 015-5z"/><circle cx="12" cy="7" r="2"/></svg>
+      Aniversários
+    </a>
+    <a href="{{ url_for('attendance.index') }}" class="nav-link {% if request.blueprint=='attendance' %}active{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Marcar Presença
     </a>
     {% endif %}
 
@@ -314,12 +329,14 @@ select option{background:var(--card);}
     </div>
     {% endif %}
 
-    {# ── Presença (todos) ── #}
+    {# ── Presença (todos exceto secretário — secretário já tem acima) ── #}
+    {% if not current_user.is_secretary %}
     <div class="nav-section">Presença</div>
     <a href="{{ url_for('attendance.index') }}" class="nav-link {% if request.blueprint=='attendance' %}active{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
       Marcar Presença
     </a>
+    {% endif %}
 
   </nav>
 
@@ -332,8 +349,10 @@ select option{background:var(--card);}
           {% if current_user.is_superadmin %}Super Admin
           {% elif current_user.is_church_admin %}Admin Igreja
           {% elif current_user.is_congregation_admin %}Admin Congregação
+          {% elif current_user.is_secretary %}Secretário
           {% else %}Professor{% endif %}
           {% if current_user.congregation %} · {{ current_user.congregation.name }}{% endif %}
+          {% if current_user.is_secretary and current_user.klass %} · {{ current_user.klass.name }}{% endif %}
         </div>
       </div>
     </div>

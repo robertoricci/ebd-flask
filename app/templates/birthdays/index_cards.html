@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Aniversários – EBD{% endblock %}
+{% block content %}
+
+{# ── Macro cartão — definida ANTES de ser usada ─────────────────────── #}
+{% macro render_card(b) %}
+<div style="background:var(--card);border:1px solid {% if b.birth_date and b.birth_date.day == today.day and b.birth_date.month == today.month %}#ec4899{% else %}var(--border){% endif %};border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;{% if b.birth_date and b.birth_date.day == today.day and b.birth_date.month == today.month %}box-shadow:0 0 0 1px #ec4899;{% endif %}">
+  <div style="width:40px;height:40px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;">
+    {{ b.name[0].upper() }}
+  </div>
+  <div style="min-width:0;flex:1;">
+    <div style="font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+      {% if b.birth_date and b.birth_date.day == today.day and b.birth_date.month == today.month %}🎉 {% endif %}{{ b.name }}
+    </div>
+    <div style="font-size:.78rem;color:var(--muted);margin-top:2px;">
+      {{ b.birth_date.strftime('%d/%m/%Y') if b.birth_date else '—' }}
+      {% if b.age %} · <span style="color:var(--warning);font-weight:600;">{{ b.age }} anos</span>{% endif %}
+    </div>
+    <div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;">
+      <span class="badge {% if b.type == 'Professor' %}badge-purple{% else %}badge-blue{% endif %}" style="font-size:.62rem;">{{ b.type }}</span>
+      {% if b.turma != '—' %}<span class="badge badge-gray" style="font-size:.62rem;">🏫 {{ b.turma }}</span>{% endif %}
+    </div>
+    {% if b.telefone != '—' %}<div style="font-size:.72rem;color:var(--muted);margin-top:4px;">📞 {{ b.telefone }}</div>{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+<div class="page-header">
+  <div>
+    <h2>Aniversários</h2>
+    <p>
+      {% if current_user.is_secretary or current_user.role == 'TEACHER' %}
+        {% if current_user.klass %}Turma: <strong>{{ current_user.klass.name }}</strong>{% else %}Sua turma{% endif %}
+      {% elif current_user.is_congregation_admin %}
+        {{ congregations[0].name if congregations else 'Sua congregação' }}
+      {% else %}Aniversariantes{% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- ── Filtros ─────────────────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+  <form method="GET" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div class="form-group" style="margin:0;min-width:180px;">
+      <label>Mês</label>
+      <select name="mes" onchange="this.form.submit()">
+        <option value="todos" {% if mes_param == 'todos' %}selected{% endif %}>Todos os meses</option>
+        {% for i in range(1, 13) %}
+        <option value="{{ i }}" {% if mes_param == i|string %}selected{% endif %}>{{ MESES[i-1] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if mes_param != 'todos' %}
+    <a href="{{ url_for('birthdays.index') }}?mes=todos" class="btn btn-secondary btn-sm" style="margin-bottom:0;">✕ Ver todos</a>
+    {% endif %}
+    <div style="margin-left:auto;">
+      <a href="{{ url_for('birthdays.pdf', mes=mes_param) }}" target="_blank" class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        Gerar PDF
+      </a>
+    </div>
+  </form>
+</div>
+
+<!-- ── Contagem ────────────────────────────────────────────────────────── -->
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+  <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;margin:0;">
+    🎂 {% if mes_param == 'todos' %}Todos os meses{% else %}{{ MESES[mes_param|int - 1] }}{% endif %}
+  </h3>
+  <span class="badge badge-blue">{{ birthday_list | length }} pessoa{{ 's' if birthday_list | length != 1 else '' }}</span>
+</div>
+
+<!-- ── Lista ───────────────────────────────────────────────────────────── -->
+{% if birthday_list %}
+
+  {% if mes_param == 'todos' %}
+    {% set ns = namespace(cur_month=-1) %}
+    {% for b in birthday_list %}
+      {% set bm = b.birth_date.month if b.birth_date else 0 %}
+      {% if bm != ns.cur_month %}
+        {% if not loop.first %}</div>{% endif %}
+        {% set ns.cur_month = bm %}
+        <div style="margin-top:{% if loop.first %}0{% else %}24px{% endif %};margin-bottom:8px;">
+          <span style="font-size:.78rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;">
+            🗓 {{ MESES[bm-1] if bm >= 1 else '—' }}
+          </span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
+      {% endif %}
+      {{ render_card(b) }}
+      {% if loop.last %}</div>{% endif %}
+    {% endfor %}
+
+  {% else %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
+      {% for b in birthday_list %}{{ render_card(b) }}{% endfor %}
+    </div>
+  {% endif %}
+
+{% else %}
+  <div class="card" style="text-align:center;padding:48px 24px;">
+    <div style="font-size:2.5rem;margin-bottom:12px;">🎂</div>
+    <p style="font-weight:600;margin-bottom:6px;">
+      {% if mes_param == 'todos' %}Nenhum aniversariante cadastrado{% else %}Nenhum aniversariante em {{ MESES[mes_param|int - 1] }}{% endif %}
+    </p>
+    <p style="color:var(--muted);font-size:.875rem;">Verifique se as datas de nascimento estão preenchidas nos cadastros.</p>
+  </div>
+{% endif %}
+
+{% endblock %}

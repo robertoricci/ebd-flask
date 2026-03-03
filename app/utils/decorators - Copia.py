@@ -27,15 +27,3 @@ def church_admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated
-
-def secretary_or_above(f):
-    """Permite SECRETARY, TEACHER, ADMIN, CHURCH_ADMIN, SUPERADMIN."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not current_user.is_authenticated:
-            abort(403)
-        allowed = ('SUPERADMIN','CHURCH_ADMIN','ADMIN','TEACHER','SECRETARY')
-        if current_user.role not in allowed:
-            abort(403)
-        return f(*args, **kwargs)
-    return decorated

@@ -3,7 +3,6 @@ from flask_login import login_required, current_user
 from app import db
 from app.models.user import User
 from app.models.church import Church, Congregation
-from app.models.klass import Class
 from app.utils.decorators import admin_required
 
 users_bp = Blueprint('users', __name__, url_prefix='/usuarios')
@@ -38,9 +37,8 @@ def index():
     users = q.order_by(User.name).all()
     congregations = _visible_congregations()
     churches = Church.query.order_by(Church.name).all() if current_user.is_superadmin else []
-    classes = Class.query.filter(Class.congregation_id.in_([c.id for c in congregations])).order_by(Class.name).all() if congregations else []
     return render_template('users/index.html', users=users, search=search,
-                           congregations=congregations, churches=churches, classes=classes)
+                           congregations=congregations, churches=churches)
 
 @users_bp.route('/create', methods=['POST'])
 @login_required
@@ -76,9 +74,8 @@ def create():
         flash(f'❌ O email "{email}" já está em uso no sistema.', 'danger')
         return redirect(url_for('users.index'))
 
-    class_id = request.form.get('class_id', type=int) or None
     u = User(name=name, email=email, role=role,
-             congregation_id=congregation_id, church_id=church_id, class_id=class_id)
+             congregation_id=congregation_id, church_id=church_id)
     u.set_password(password)
     db.session.add(u)
     db.session.commit()
@@ -117,7 +114,6 @@ def edit(id):
         u.role = role
         u.congregation_id = request.form.get('congregation_id', type=int) or None
         u.church_id       = request.form.get('church_id', type=int) or None
-        u.class_id        = request.form.get('class_id', type=int) or None
     elif current_user.is_church_admin:
         if role not in ('SUPERADMIN', 'CHURCH_ADMIN'):
             u.role = role
@@ -156,12 +152,3 @@ def congregations_by_church():
     church_id = request.args.get('church_id', type=int)
     congs = Congregation.query.filter_by(church_id=church_id).order_by(Congregation.name).all() if church_id else []
     return jsonify([{'id': c.id, 'name': c.name} for c in congs])
-
-
-
-@users_bp.route('/classes-by-congregation')
-@login_required
-def classes_by_congregation():
-    congregation_id = request.args.get('congregation_id', type=int)
-    classes = Class.query.filter_by(congregation_id=congregation_id).order_by(Class.name).all() if congregation_id else []
-    return jsonify([{'id': c.id, 'name': c.name} for c in classes])

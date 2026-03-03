@@ -9,12 +9,11 @@
   </form>
   <button class="btn btn-primary" onclick="openModal('createModal')">+ Novo Usuário</button>
 </div>
-
 <div class="card">
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Congregação / Turma</th><th>Status</th><th>Ações</th></tr>
+        <tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Congregação</th><th>Status</th><th>Ações</th></tr>
       </thead>
       <tbody>
         {% for u in users %}
@@ -25,7 +24,6 @@
             {% if u.role == 'SUPERADMIN' %}<span class="badge" style="background:rgba(124,58,237,.2);color:#7c3aed;">SUPERADMIN</span>
             {% elif u.role == 'CHURCH_ADMIN' %}<span class="badge badge-purple">CHURCH ADMIN</span>
             {% elif u.role == 'ADMIN' %}<span class="badge badge-blue">ADMIN</span>
-            {% elif u.role == 'SECRETARY' %}<span class="badge" style="background:rgba(236,72,153,.15);color:#ec4899;">SECRETÁRIO</span>
             {% else %}<span class="badge badge-yellow">PROFESSOR</span>{% endif %}
           </td>
           <td style="font-size:.8rem;">
@@ -35,17 +33,12 @@
             {% elif u.church %}
               <div style="color:var(--muted);">{{ u.church.name }} (igreja)</div>
             {% else %}—{% endif %}
-            {% if u.role == 'SECRETARY' and u.klass %}
-              <div style="margin-top:3px;"><span class="badge badge-blue" style="font-size:.65rem;">🏫 {{ u.klass.name }}</span></div>
-            {% endif %}
           </td>
           <td>
             <span class="badge {% if u.active %}badge-green{% else %}badge-red{% endif %}">{{ 'Ativo' if u.active else 'Inativo' }}</span>
           </td>
           <td style="display:flex;gap:4px;">
-            <button class="btn btn-secondary btn-sm"
-              onclick="openEdit({{ u.id }}, '{{ u.name | e }}', '{{ u.email }}', '{{ u.role }}',
-                       {{ u.congregation_id or 'null' }}, {{ u.church_id or 'null' }}, {{ u.class_id or 'null' }})">✏️</button>
+            <button class="btn btn-secondary btn-sm" onclick="openEdit({{ u.id }}, '{{ u.name }}', '{{ u.email }}', '{{ u.role }}', {{ u.congregation_id or 'null' }}, {{ u.church_id or 'null' }})">✏️</button>
             <form method="POST" action="{{ url_for('users.delete', id=u.id) }}" onsubmit="return confirm('Remover?')">
               <button class="btn btn-danger btn-sm">🗑️</button>
             </form>
@@ -61,29 +54,29 @@
 
 {% macro role_options(selected='') %}
   {% if current_user.is_superadmin %}
-    <option value="SUPERADMIN"   {% if selected=='SUPERADMIN'   %}selected{% endif %}>Super Admin</option>
+    <option value="SUPERADMIN" {% if selected=='SUPERADMIN' %}selected{% endif %}>Super Admin</option>
     <option value="CHURCH_ADMIN" {% if selected=='CHURCH_ADMIN' %}selected{% endif %}>Admin de Igreja</option>
   {% endif %}
-  <option value="ADMIN"     {% if selected=='ADMIN'     %}selected{% endif %}>Admin de Congregação</option>
-  <option value="TEACHER"   {% if selected=='TEACHER'   %}selected{% endif %}>Professor</option>
-  <option value="SECRETARY" {% if selected=='SECRETARY' %}selected{% endif %}>Secretário</option>
+  <option value="ADMIN" {% if selected=='ADMIN' %}selected{% endif %}>Admin de Congregação</option>
+  <option value="TEACHER" {% if selected=='TEACHER' %}selected{% endif %}>Professor</option>
 {% endmacro %}
 
-<!-- ── Modal Criar ──────────────────────────────────────────────────────── -->
+<!-- Modal Criar -->
 <div class="modal-overlay" id="createModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('createModal')">✕</button>
     <h3>Novo Usuário</h3>
     <form method="POST" action="{{ url_for('users.create') }}">
-      <div class="form-group"><label>Nome *</label><input name="name" required autofocus></div>
+      <div class="form-group"><label>Nome *</label><input name="name" required></div>
       <div class="form-group"><label>Email *</label><input type="email" name="email" required></div>
       <div class="form-group"><label>Senha *</label><input type="password" name="password" required></div>
-      <div class="form-group">
-        <label>Perfil</label>
-        <select name="role" id="cRole" onchange="updateFields('c')">{{ role_options() }}</select>
+      <div class="form-group"><label>Perfil</label>
+        <select name="role" id="cRole" onchange="updateCongFields('c')">
+          {{ role_options() }}
+        </select>
       </div>
       {% if current_user.is_superadmin %}
-      <div class="form-group" id="cChurchDiv" style="display:none;">
+      <div class="form-group" id="cChurchDiv">
         <label>Igreja</label>
         <select name="church_id" id="cChurch" onchange="loadCongregations('c', this.value)">
           <option value="">— Selecione —</option>
@@ -93,16 +86,9 @@
       {% endif %}
       <div class="form-group" id="cCongDiv">
         <label>Congregação</label>
-        <select name="congregation_id" id="cCong" onchange="loadClasses('c', this.value)">
+        <select name="congregation_id" id="cCong">
           <option value="">— Selecione —</option>
-          {% for cg in congregations %}<option value="{{ cg.id }}">{{ cg.name }}{% if current_user.is_superadmin %} · {{ cg.church.name if cg.church else '' }}{% endif %}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="form-group" id="cClassDiv" style="display:none;">
-        <label>Turma vinculada <span style="font-size:.7rem;color:var(--warning);">⚠️ obrigatório para Secretário</span></label>
-        <select name="class_id" id="cClass">
-          <option value="">— Selecione a congregação primeiro —</option>
-          {% for cl in classes %}<option value="{{ cl.id }}">{{ cl.name }}</option>{% endfor %}
+          {% for cg in congregations %}<option value="{{ cg.id }}">{{ cg.name }}{% if current_user.is_superadmin %} · {{ cg.church.name }}{% endif %}</option>{% endfor %}
         </select>
       </div>
       <button class="btn btn-primary" type="submit" style="width:100%;">Criar</button>
@@ -110,7 +96,7 @@
   </div>
 </div>
 
-<!-- ── Modal Editar ─────────────────────────────────────────────────────── -->
+<!-- Modal Editar -->
 <div class="modal-overlay" id="editModal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal('editModal')">✕</button>
@@ -118,13 +104,14 @@
     <form method="POST" id="editForm">
       <div class="form-group"><label>Nome *</label><input name="name" id="eName" required></div>
       <div class="form-group"><label>Email *</label><input type="email" name="email" id="eEmail" required></div>
-      <div class="form-group"><label>Nova senha <span style="font-size:.7rem;color:var(--muted);">vazio = não altera</span></label><input type="password" name="password"></div>
-      <div class="form-group">
-        <label>Perfil</label>
-        <select name="role" id="eRole" onchange="updateFields('e')">{{ role_options() }}</select>
+      <div class="form-group"><label>Nova senha (deixe vazio para não alterar)</label><input type="password" name="password"></div>
+      <div class="form-group"><label>Perfil</label>
+        <select name="role" id="eRole" onchange="updateCongFields('e')">
+          {{ role_options() }}
+        </select>
       </div>
       {% if current_user.is_superadmin %}
-      <div class="form-group" id="eChurchDiv" style="display:none;">
+      <div class="form-group" id="eChurchDiv">
         <label>Igreja</label>
         <select name="church_id" id="eChurch" onchange="loadCongregations('e', this.value)">
           <option value="">— Selecione —</option>
@@ -134,16 +121,9 @@
       {% endif %}
       <div class="form-group" id="eCongDiv">
         <label>Congregação</label>
-        <select name="congregation_id" id="eCong" onchange="loadClasses('e', this.value)">
+        <select name="congregation_id" id="eCong">
           <option value="">— Selecione —</option>
-          {% for cg in congregations %}<option value="{{ cg.id }}">{{ cg.name }}{% if current_user.is_superadmin %} · {{ cg.church.name if cg.church else '' }}{% endif %}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="form-group" id="eClassDiv" style="display:none;">
-        <label>Turma vinculada <span style="font-size:.7rem;color:var(--warning);">⚠️ obrigatório para Secretário</span></label>
-        <select name="class_id" id="eClass">
-          <option value="">— Selecione a congregação primeiro —</option>
-          {% for cl in classes %}<option value="{{ cl.id }}">{{ cl.name }}</option>{% endfor %}
+          {% for cg in congregations %}<option value="{{ cg.id }}">{{ cg.name }}{% if current_user.is_superadmin %} · {{ cg.church.name }}{% endif %}</option>{% endfor %}
         </select>
       </div>
       <button class="btn btn-primary" type="submit" style="width:100%;">Salvar</button>
@@ -151,17 +131,15 @@
   </div>
 </div>
 {% endblock %}
-
 {% block scripts %}
 <script>
-function updateFields(p) {
-  const role      = document.getElementById(p+'Role').value;
-  const churchDiv = document.getElementById(p+'ChurchDiv');
-  const congDiv   = document.getElementById(p+'CongDiv');
-  const classDiv  = document.getElementById(p+'ClassDiv');
-  if (churchDiv) churchDiv.style.display = (role === 'CHURCH_ADMIN' || role === 'SUPERADMIN') ? '' : 'none';
-  if (congDiv)   congDiv.style.display   = ['ADMIN','TEACHER','SECRETARY'].includes(role) ? '' : 'none';
-  if (classDiv)  classDiv.style.display  = role === 'SECRETARY' ? '' : 'none';
+function updateCongFields(prefix) {
+  const role = document.getElementById(prefix+'Role').value;
+  const isChurchAdmin = role === 'CHURCH_ADMIN';
+  const churchDiv = document.getElementById(prefix+'ChurchDiv');
+  const congDiv   = document.getElementById(prefix+'CongDiv');
+  if (churchDiv) churchDiv.style.display = isChurchAdmin ? '' : 'none';
+  if (congDiv)   congDiv.style.display   = (role === 'ADMIN' || role === 'TEACHER') ? '' : 'none';
 }
 
 async function loadCongregations(prefix, churchId) {
@@ -171,44 +149,24 @@ async function loadCongregations(prefix, churchId) {
   const data = await res.json();
   sel.innerHTML = '<option value="">— Selecione —</option>' +
     data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-  loadClasses(prefix, '');
 }
 
-async function loadClasses(prefix, congId) {
-  const sel = document.getElementById(prefix+'Class');
-  if (!sel) return;
-  if (!congId) {
-    sel.innerHTML = '<option value="">— Selecione a congregação primeiro —</option>';
-    return;
-  }
-  sel.innerHTML = '<option value="">Carregando...</option>';
-  const res  = await fetch(`/usuarios/classes-by-congregation?congregation_id=${congId}`);
-  const data = await res.json();
-  sel.innerHTML = '<option value="">— Selecione —</option>' +
-    data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-}
-
-function openEdit(id, name, email, role, congId, churchId, classId) {
+function openEdit(id, name, email, role, congId, churchId) {
   document.getElementById('editForm').action = `/usuarios/${id}/edit`;
   document.getElementById('eName').value  = name;
   document.getElementById('eEmail').value = email;
   document.getElementById('eRole').value  = role;
-  const eChurch = document.getElementById('eChurch');
-  if (eChurch && churchId) eChurch.value = String(churchId);
-  if (congId) document.getElementById('eCong').value = String(congId);
-  updateFields('e');
-  if (classId) {
-    setTimeout(() => {
-      const eClass = document.getElementById('eClass');
-      if (eClass) {
-        const opt = eClass.querySelector(`option[value="${classId}"]`);
-        if (opt) eClass.value = String(classId);
-      }
-    }, 150);
+  if (document.getElementById('eChurch') && churchId) {
+    document.getElementById('eChurch').value = churchId;
   }
+  if (document.getElementById('eCong') && congId) {
+    document.getElementById('eCong').value = congId;
+  }
+  updateCongFields('e');
   openModal('editModal');
 }
 
-['c','e'].forEach(p => updateFields(p));
+// Init
+['c','e'].forEach(p => updateCongFields(p));
 </script>
 {% endblock %}

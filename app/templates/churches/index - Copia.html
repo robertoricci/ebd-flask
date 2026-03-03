@@ -35,8 +35,6 @@
             </span>
           </td>
           <td style="display:flex;gap:6px;">
-            <a href="{{ url_for('churches.congregations', church_id=church.id) }}"
-               class="btn btn-secondary btn-sm" title="Congregações">🏘️</a>
             <button class="btn btn-secondary btn-sm"
               onclick="openEdit({{ church.id }}, '{{ church.name | e }}', '{{ church.city or '' }}', '{{ church.state or '' }}', '{{ church.app_icon or '' }}', '{{ church.app_title or '' }}', '{{ church.app_subtitle or '' }}')">✏️</button>
             <button class="btn btn-secondary btn-sm" id="toggle-{{ church.id }}"

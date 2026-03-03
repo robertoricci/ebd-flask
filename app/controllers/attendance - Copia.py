@@ -14,15 +14,6 @@ def index():
 
     if current_user.is_admin:
         available_lessons = Lesson.query.filter_by(status='LIBERADO').order_by(Lesson.date.desc()).all()
-    elif current_user.is_secretary:
-        # Secretário vê apenas a turma vinculada ao seu cadastro
-        if current_user.class_id:
-            available_lessons = Lesson.query.filter(
-                Lesson.status == 'LIBERADO',
-                Lesson.class_id == current_user.class_id
-            ).order_by(Lesson.date.desc()).all()
-        else:
-            available_lessons = []
     else:
         from app.models.teacher import Teacher
         teacher = Teacher.query.filter_by(email=current_user.email).first()

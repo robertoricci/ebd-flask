@@ -32,10 +32,6 @@ def _enrolled_count(class_id):
 @dashboard_bp.route('/dashboard')
 @login_required
 def index():
-    # Secretário não tem acesso ao dashboard — redireciona para aniversários
-    if current_user.is_secretary:
-        from flask import redirect, url_for
-        return redirect(url_for('birthdays.index'))
     cong_ids = congregation_ids()
 
     # ── Filtros ──────────────────────────────────────────────────────────
