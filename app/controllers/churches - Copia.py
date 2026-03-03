@@ -21,9 +21,6 @@ def create():
         name=request.form.get('name','').strip(),
         city=request.form.get('city','').strip() or None,
         state=request.form.get('state','').strip() or None,
-        app_icon=request.form.get('app_icon','').strip() or None,
-        app_title=request.form.get('app_title','').strip() or None,
-        app_subtitle=request.form.get('app_subtitle','').strip() or None,
     )
     db.session.add(c); db.session.commit()
     flash('Igreja criada!', 'success')
@@ -34,12 +31,9 @@ def create():
 @superadmin_required
 def edit(id):
     c = Church.query.get_or_404(id)
-    c.name        = request.form.get('name', c.name).strip()
-    c.city        = request.form.get('city','').strip() or None
-    c.state       = request.form.get('state','').strip() or None
-    c.app_icon    = request.form.get('app_icon','').strip() or None
-    c.app_title   = request.form.get('app_title','').strip() or None
-    c.app_subtitle= request.form.get('app_subtitle','').strip() or None
+    c.name  = request.form.get('name', c.name).strip()
+    c.city  = request.form.get('city','').strip() or None
+    c.state = request.form.get('state','').strip() or None
     db.session.commit()
     flash('Igreja atualizada!', 'success')
     return redirect(url_for('churches.index'))

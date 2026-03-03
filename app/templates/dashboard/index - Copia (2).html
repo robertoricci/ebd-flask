@@ -131,25 +131,6 @@
 </div>
 
 <!-- ── Gráfico ────────────────────────────────────────────────────────────── -->
-<script>
-function filterBirthdays(val) {
-  const url = new URL(window.location.href);
-  url.searchParams.set('bday_filter', val);
-  window.location.href = url.toString();
-}
-// Atualiza link PDF dinamicamente
-document.addEventListener('DOMContentLoaded', () => {
-  const sel = document.getElementById('bdayMesFilter');
-  const btn = document.getElementById('bdayPdfBtn');
-  if (sel && btn) {
-    sel.addEventListener('change', () => {
-      const mes = sel.value === 'mes' ? (new Date().getMonth()+1) : 'todos';
-      btn.href = `/relatorios/aniversariantes-pdf?mes=${mes}`;
-    });
-  }
-});
-</script>
-
 {% if chart_labels %}
 <div class="card" style="margin-bottom:20px;">
   <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;margin-bottom:20px;">
@@ -250,55 +231,24 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 
   <div class="card">
-    <!-- Cabeçalho aniversariantes -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-      <h3 style="font-family:'Playfair Display',serif;font-size:1rem;margin:0;">🎂 Aniversariantes</h3>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <!-- Filtro mês -->
-        <select id="bdayMesFilter" onchange="filterBirthdays(this.value)"
-          style="font-size:.75rem;padding:4px 8px;background:var(--hover);color:var(--text);border:1px solid var(--border);border-radius:6px;cursor:pointer;">
-          <option value="mes" {% if bday_filter=='mes' %}selected{% endif %}>Este mês</option>
-          <option value="todos" {% if bday_filter=='todos' %}selected{% endif %}>Todos</option>
-        </select>
-        <!-- Botão PDF -->
-        <a id="bdayPdfBtn"
-          href="/relatorios/aniversariantes-pdf?mes={{ bday_mes if bday_filter=='mes' else 'todos' }}"
-          target="_blank"
-          style="font-size:.72rem;padding:4px 10px;background:var(--primary);color:#fff;border-radius:6px;text-decoration:none;white-space:nowrap;">
-          📄 PDF
-        </a>
-      </div>
-    </div>
-
-    <!-- Label mês atual -->
-    <div id="bdayMesLabel" style="font-size:.72rem;color:var(--muted);margin-bottom:8px;">
-      {% set MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] %}
-      {% if bday_filter == 'mes' %}{{ MESES[today.month - 1] }}{% else %}Todos os meses{% endif %}
-      · {{ birthdays | length }} aniversariante{{ 's' if birthdays | length != 1 else '' }}
-    </div>
-
+    <h3 style="font-family:'Playfair Display',serif;font-size:1rem;margin-bottom:16px;">🎂 Aniversariantes do Mês</h3>
     {% if birthdays %}
-    <div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;">
+    <div style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;">
       {% for b in birthdays %}
-      <div style="padding:8px 10px;background:var(--hover);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <div style="font-size:.875rem;flex:1;min-width:0;">
-          {% if b.birth_date and b.birth_date.day == today.day and b.birth_date.month == today.month %}
-            <span style="margin-right:4px;">🎉</span>
-          {% endif %}
-          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:140px;vertical-align:bottom;">{{ b.name }}</span>
+      <div style="padding:8px;background:var(--hover);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:.875rem;">
+          {% if b.birth_date and b.birth_date.day == today.day %}<span style="margin-right:4px;">🎉</span>{% endif %}
+          {{ b.name }}
         </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
-          <span style="font-size:.72rem;color:var(--muted);">{{ b.birth_date.strftime('%d/%m') if b.birth_date else '' }}</span>
-          {% if b.age %}<span style="font-size:.72rem;color:var(--accent);font-weight:600;">{{ b.age }} anos</span>{% endif %}
-          <span class="badge {% if b.type == 'Professor' %}badge-purple{% else %}badge-blue{% endif %}" style="font-size:.62rem;">{{ b.type }}</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:.75rem;color:var(--muted);">{{ b.birth_date | fmt_date if b.birth_date else '' }}</span>
+          <span class="badge {% if b.type == 'Professor' %}badge-purple{% else %}badge-blue{% endif %}" style="font-size:.65rem;">{{ b.type }}</span>
         </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p style="color:var(--muted);font-size:.875rem;">
-      {% if bday_filter == 'mes' %}Nenhum aniversariante este mês.{% else %}Nenhum cadastro com data de aniversário.{% endif %}
-    </p>
+    <p style="color:var(--muted);font-size:.875rem;">Nenhum aniversariante este mês.</p>
     {% endif %}
   </div>
 </div>

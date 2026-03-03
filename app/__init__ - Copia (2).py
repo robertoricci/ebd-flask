@@ -75,20 +75,6 @@ def create_app():
                     if church.app_subtitle: subtitle = church.app_subtitle
         except Exception:
             pass
-        icon = ''
-        try:
-            if current_user and current_user.is_authenticated:
-                church2 = None
-                if current_user.is_superadmin:
-                    from app.models.church import Church as C2
-                    church2 = C2.query.filter_by(active=True).first()
-                elif current_user.church_id:
-                    from app.models.church import Church as C2
-                    church2 = C2.query.get(current_user.church_id)
-                if church2 and church2.app_icon:
-                    icon = church2.app_icon
-        except Exception:
-            pass
-        return {'app_title': title, 'app_subtitle': subtitle, 'app_icon': icon}
+        return {'app_title': title, 'app_subtitle': subtitle}
 
     return app

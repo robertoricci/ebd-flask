@@ -89,3 +89,10 @@ flask db upgrade
 - ✅ Aniversários do mês
 - ✅ Oferta por aula
 - ✅ Design responsivo (mobile-first)
+
+
+# Corrigir line endings do entrypoint
+sed -i 's/\r//' entrypoint.sh
+
+# Garantir permissão de execução
+chmod +x entrypoint.sh

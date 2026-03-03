@@ -158,30 +158,19 @@ def index():
     # ── Aniversariantes do mês (respeitando scope) ────────────────────────
     today = date.today()
     month = today.month
-    bday_filter = request.args.get('bday_filter', 'mes')  # 'mes' ou 'todos'
-    bday_mes    = month  # mês atual
-
-    tq = Teacher.query.filter(Teacher.congregation_id.in_(eff_cong_ids), Teacher.active == True)
-    sq = Student.query.filter(Student.congregation_id.in_(eff_cong_ids), Student.active == True)
-    if bday_filter == 'mes':
-        tq = tq.filter(func.extract('month', Teacher.birth_date) == month)
-        sq = sq.filter(func.extract('month', Student.birth_date) == month)
-
-    from datetime import date as _date
-    def _age(b):
-        if not b: return None
-        t = _date.today()
-        return t.year - b.year - ((t.month, t.day) < (b.month, b.day))
-
+    birthday_teachers = Teacher.query.filter(
+        Teacher.congregation_id.in_(eff_cong_ids),
+        func.extract('month', Teacher.birth_date) == month
+    ).all()
+    birthday_students = Student.query.filter(
+        Student.congregation_id.in_(eff_cong_ids),
+        func.extract('month', Student.birth_date) == month
+    ).all()
     birthdays = (
-        [{'name': t.name, 'type': 'Professor', 'birth_date': t.birth_date, 'age': _age(t.birth_date)} for t in tq.order_by(Teacher.name).all()] +
-        [{'name': s.name, 'type': 'Aluno',     'birth_date': s.birth_date, 'age': _age(s.birth_date)} for s in sq.order_by(Student.name).all()]
+        [{'name': t.name, 'type': 'Professor', 'birth_date': t.birth_date} for t in birthday_teachers] +
+        [{'name': s.name, 'type': 'Aluno',     'birth_date': s.birth_date} for s in birthday_students]
     )
-    if bday_filter == 'mes':
-        birthdays.sort(key=lambda x: (x['birth_date'].day if x['birth_date'] else 0))
-    else:
-        birthdays.sort(key=lambda x: (x['birth_date'].month if x['birth_date'] else 13,
-                                      x['birth_date'].day   if x['birth_date'] else 0))
+    birthdays.sort(key=lambda x: x['birth_date'].day if x['birth_date'] else 0)
 
     return render_template('dashboard/index.html',
         years=years, trimesters=trimesters, classes=classes,
@@ -198,8 +187,6 @@ def index():
         chart_labels=chart_labels, chart_data=chart_data,
         today=today, today_lessons=Lesson.query.filter_by(date=today).all(),
         birthdays=birthdays,
-        bday_filter=bday_filter,
-        bday_mes=bday_mes,
         total_students=Student.query.filter(Student.congregation_id.in_(eff_cong_ids)).count(),
         total_teachers=Teacher.query.filter(Teacher.congregation_id.in_(eff_cong_ids)).count(),
         total_classes=Class.query.filter(Class.congregation_id.in_(eff_cong_ids)).count(),

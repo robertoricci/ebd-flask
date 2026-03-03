@@ -21,7 +21,6 @@ def create():
         name=request.form.get('name','').strip(),
         city=request.form.get('city','').strip() or None,
         state=request.form.get('state','').strip() or None,
-        app_icon=request.form.get('app_icon','').strip() or None,
         app_title=request.form.get('app_title','').strip() or None,
         app_subtitle=request.form.get('app_subtitle','').strip() or None,
     )
@@ -37,7 +36,6 @@ def edit(id):
     c.name        = request.form.get('name', c.name).strip()
     c.city        = request.form.get('city','').strip() or None
     c.state       = request.form.get('state','').strip() or None
-    c.app_icon    = request.form.get('app_icon','').strip() or None
     c.app_title   = request.form.get('app_title','').strip() or None
     c.app_subtitle= request.form.get('app_subtitle','').strip() or None
     db.session.commit()

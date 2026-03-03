@@ -200,52 +200,6 @@ def index():
 
     show_congregation_col = current_user.is_superadmin or current_user.is_church_admin
 
-    # ── Aba aniversariantes ────────────────────────────────────────────────
-    from app.models.student import Student as _Stu
-    from app.models.teacher import Teacher as _Tea
-    from datetime import date as _date
-    from sqlalchemy import func as _func
-
-    active_tab = request.args.get('tab', 'frequencia')
-    mes_param  = request.args.get('mes', '')
-    birthday_list = []
-
-    if active_tab == 'aniversariantes':
-        def _age(b):
-            if not b: return None
-            t = _date.today()
-            return t.year - b.year - ((t.month, t.day) < (b.month, b.day))
-
-        sq = _Stu.query.filter(_Stu.congregation_id.in_(cong_ids), _Stu.active == True)
-        tq = _Tea.query.filter(_Tea.congregation_id.in_(cong_ids), _Tea.active == True)
-
-        if mes_param:
-            try:
-                m = int(mes_param)
-                sq = sq.filter(_func.extract('month', _Stu.birth_date) == m)
-                tq = tq.filter(_func.extract('month', _Tea.birth_date) == m)
-            except ValueError:
-                pass
-
-        def _turmas(s):
-            nomes = [k.name for k in s.classes] if hasattr(s, 'classes') else []
-            return ', '.join(nomes) if nomes else '—'
-
-        for s in sq.order_by(_Stu.name).all():
-            birthday_list.append({'name': s.name, 'birth_date': s.birth_date,
-                'age': _age(s.birth_date), 'type': 'Aluno',
-                'turma': _turmas(s), 'telefone': s.phone or '—', 'email': s.email or '—'})
-        for t in tq.order_by(_Tea.name).all():
-            birthday_list.append({'name': t.name, 'birth_date': t.birth_date,
-                'age': _age(t.birth_date), 'type': 'Professor',
-                'turma': '—', 'telefone': t.phone or '—', 'email': t.email or '—'})
-
-        if mes_param:
-            birthday_list.sort(key=lambda x: (x['birth_date'].day if x['birth_date'] else 0))
-        else:
-            birthday_list.sort(key=lambda x: (x['birth_date'].month if x['birth_date'] else 13,
-                                               x['birth_date'].day   if x['birth_date'] else 0))
-
     return render_template('reports/index.html',
         years=years, trimesters=trimesters, classes=classes,
         congregations=congregations, lesson_titles=lesson_titles,
@@ -255,7 +209,6 @@ def index():
         class_stats=class_stats or [],
         visitors_list=visitors_list,
         show_congregation_col=show_congregation_col,
-        birthday_list=birthday_list,
         total_enrolled=te or 0, total_present=tp or 0, total_absent=ta or 0,
         total_visitors=tv or 0, total_geral=tg or 0, total_pct=tpct or 0.0,
         total_offering=to_ or 0.0, total_bibles=tb or 0, total_magazines=tm or 0)

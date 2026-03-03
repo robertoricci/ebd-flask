@@ -1,35 +1,49 @@
 {% extends 'base.html' %}
 {% block title %}Igrejas – EBD{% endblock %}
 {% block content %}
-<div class="page-header"><h2>⛪ Igrejas</h2><p>Gerencie as igrejas cadastradas no sistema</p></div>
+<div class="page-header"><h2>Igrejas</h2><p>Gerencie as igrejas cadastradas</p></div>
 <div class="toolbar">
-  <div></div>
+  <span style="color:var(--muted);font-size:.875rem;">{{ churches | length }} igreja(s)</span>
   <button class="btn btn-primary" onclick="openModal('createModal')">+ Nova Igreja</button>
 </div>
+
 <div class="card">
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Nome</th><th>Cidade</th><th>UF</th><th>Congregações</th><th>Status</th><th>Ações</th></tr></thead>
+      <thead>
+        <tr><th>Nome</th><th>Cidade</th><th>UF</th><th>Nome no Sistema</th><th>Status</th><th>Ações</th></tr>
+      </thead>
       <tbody>
         {% for church in churches %}
         <tr>
           <td><div style="font-weight:600;">{{ church.name }}</div></td>
           <td>{{ church.city or '—' }}</td>
           <td>{{ church.state or '—' }}</td>
-          <td>
-            <a href="{{ url_for('churches.congregations', church_id=church.id) }}" class="badge badge-blue" style="cursor:pointer;text-decoration:none;">
-              {{ church.congregations.count() }} congregações
-            </a>
+          <td style="font-size:.8rem;">
+            {% if church.app_title or church.app_subtitle %}
+              <div style="font-weight:500;color:var(--text);">
+                {% if church.app_icon %}{{ church.app_icon }} {% endif %}{{ church.app_title or 'EBD' }}
+              </div>
+              <div style="font-size:.72rem;color:var(--muted);">{{ church.app_subtitle or 'Sistema de Frequência' }}</div>
+            {% else %}
+              <span style="color:var(--muted);">—</span>
+            {% endif %}
           </td>
           <td>
-            <span class="badge {% if church.active %}badge-green{% else %}badge-red{% endif %}">
+            <span id="status-{{ church.id }}" class="badge {{ 'badge-green' if church.active else 'badge-gray' }}">
               {{ 'Ativa' if church.active else 'Inativa' }}
             </span>
           </td>
           <td style="display:flex;gap:6px;">
             <button class="btn btn-secondary btn-sm"
-              onclick="openEdit({{ church.id }}, '{{ church.name }}', '{{ church.city or '' }}', '{{ church.state or '' }}')">✏️</button>
-            <form method="POST" action="{{ url_for('churches.delete', id=church.id) }}" onsubmit="return confirm('Remover igreja e todas suas congregações?')">
+              onclick="openEdit({{ church.id }}, '{{ church.name | e }}', '{{ church.city or '' }}', '{{ church.state or '' }}', '{{ church.app_icon or '' }}', '{{ church.app_title or '' }}', '{{ church.app_subtitle or '' }}')">✏️</button>
+            <button class="btn btn-secondary btn-sm" id="toggle-{{ church.id }}"
+              onclick="toggleChurch({{ church.id }})"
+              title="{{ 'Inativar' if church.active else 'Ativar' }}">
+              {{ '🔕' if church.active else '✅' }}
+            </button>
+            <form method="POST" action="{{ url_for('churches.delete', id=church.id) }}"
+              onsubmit="return confirm('Remover esta igreja e todas as congregações?')">
               <button class="btn btn-danger btn-sm">🗑️</button>
             </form>
           </td>
@@ -42,44 +56,124 @@
   </div>
 </div>
 
+<!-- ── Modal Criar ─────────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="createModal">
-  <div class="modal">
+  <div class="modal modal-lg">
     <button class="modal-close" onclick="closeModal('createModal')">✕</button>
     <h3>Nova Igreja</h3>
     <form method="POST" action="{{ url_for('churches.create') }}">
-      <div class="form-group"><label>Nome *</label><input name="name" required autofocus></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="grid-column:1/-1"><label>Nome *</label><input name="name" required autofocus></div>
         <div class="form-group"><label>Cidade</label><input name="city"></div>
         <div class="form-group"><label>Estado (UF)</label><input name="state" maxlength="2" style="text-transform:uppercase;"></div>
       </div>
-      <button class="btn btn-primary" type="submit" style="width:100%;">Criar</button>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">
+      <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;">
+        🎨 <strong style="color:var(--text);">Nome no sistema</strong> — aparece no menu lateral para todos os usuários desta igreja
+      </p>
+      <div style="display:grid;grid-template-columns:80px 1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label>Ícone <span style="font-size:.7rem;color:var(--muted);">emoji</span></label>
+          <input name="app_icon" id="cIcon" placeholder="✝️" maxlength="4"
+            style="font-size:1.3rem;text-align:center;" oninput="updatePreview('c')">
+        </div>
+        <div class="form-group">
+          <label>Título <span style="font-size:.7rem;color:var(--muted);">padrão: EBD</span></label>
+          <input name="app_title" id="cTitle" placeholder="EBD" oninput="updatePreview('c')">
+        </div>
+        <div class="form-group">
+          <label>Subtítulo <span style="font-size:.7rem;color:var(--muted);">padrão: Sistema de Frequência</span></label>
+          <input name="app_subtitle" id="cSubtitle" placeholder="Sistema de Frequência" oninput="updatePreview('c')">
+        </div>
+      </div>
+      <div style="background:var(--hover);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:.75rem;color:var(--muted);">Pré-visualização:</span>
+        <div>
+          <div style="font-weight:700;font-size:1rem;" id="cPreview">EBD</div>
+          <div style="font-size:.75rem;color:var(--muted);" id="cSubPreview">Sistema de Frequência</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;">Criar Igreja</button>
     </form>
   </div>
 </div>
 
+<!-- ── Modal Editar ────────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="editModal">
-  <div class="modal">
+  <div class="modal modal-lg">
     <button class="modal-close" onclick="closeModal('editModal')">✕</button>
     <h3>Editar Igreja</h3>
     <form method="POST" id="editForm">
-      <div class="form-group"><label>Nome *</label><input name="name" id="eNome" required></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="grid-column:1/-1"><label>Nome *</label><input name="name" id="eNome" required></div>
         <div class="form-group"><label>Cidade</label><input name="city" id="eCidade"></div>
         <div class="form-group"><label>Estado (UF)</label><input name="state" id="eEstado" maxlength="2" style="text-transform:uppercase;"></div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px;">
+      <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px;">
+        🎨 <strong style="color:var(--text);">Nome no sistema</strong> — aparece no menu lateral para todos os usuários desta igreja
+      </p>
+      <div style="display:grid;grid-template-columns:80px 1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label>Ícone <span style="font-size:.7rem;color:var(--muted);">emoji</span></label>
+          <input name="app_icon" id="eIcon" placeholder="✝️" maxlength="4"
+            style="font-size:1.3rem;text-align:center;" oninput="updatePreview('e')">
+        </div>
+        <div class="form-group">
+          <label>Título <span style="font-size:.7rem;color:var(--muted);">padrão: EBD</span></label>
+          <input name="app_title" id="eTitle" placeholder="EBD" oninput="updatePreview('e')">
+        </div>
+        <div class="form-group">
+          <label>Subtítulo <span style="font-size:.7rem;color:var(--muted);">padrão: Sistema de Frequência</span></label>
+          <input name="app_subtitle" id="eSubtitle" placeholder="Sistema de Frequência" oninput="updatePreview('e')">
+        </div>
+      </div>
+      <div style="background:var(--hover);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:.75rem;color:var(--muted);">Pré-visualização:</span>
+        <div>
+          <div style="font-weight:700;font-size:1rem;" id="ePreview">EBD</div>
+          <div style="font-size:.75rem;color:var(--muted);" id="eSubPreview">Sistema de Frequência</div>
+        </div>
       </div>
       <button class="btn btn-primary" type="submit" style="width:100%;">Salvar</button>
     </form>
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
-function openEdit(id, name, city, state) {
-  document.getElementById('editForm').action = `/igrejas/${id}/edit`;
-  document.getElementById('eNome').value   = name;
-  document.getElementById('eCidade').value = city;
-  document.getElementById('eEstado').value = state;
+function updatePreview(p) {
+  const icon     = document.getElementById(p + 'Icon').value.trim();
+  const title    = document.getElementById(p + 'Title').value.trim() || 'EBD';
+  const subtitle = document.getElementById(p + 'Subtitle').value.trim() || 'Sistema de Frequência';
+  document.getElementById(p + 'Preview').textContent    = (icon ? icon + ' ' : '') + title;
+  document.getElementById(p + 'SubPreview').textContent = subtitle;
+}
+
+function openEdit(id, name, city, state, icon, title, subtitle) {
+  document.getElementById('editForm').action  = `/igrejas/${id}/edit`;
+  document.getElementById('eNome').value      = name;
+  document.getElementById('eCidade').value    = city;
+  document.getElementById('eEstado').value    = state;
+  document.getElementById('eIcon').value      = icon;
+  document.getElementById('eTitle').value     = title;
+  document.getElementById('eSubtitle').value  = subtitle;
+  updatePreview('e');
   openModal('editModal');
+}
+
+async function toggleChurch(id) {
+  const res  = await fetch(`/igrejas/${id}/toggle`, { method: 'POST' });
+  const data = await res.json();
+  const badge = document.getElementById(`status-${id}`);
+  const btn   = document.getElementById(`toggle-${id}`);
+  badge.className   = `badge ${data.active ? 'badge-green' : 'badge-gray'}`;
+  badge.textContent = data.active ? 'Ativa' : 'Inativa';
+  btn.textContent   = data.active ? '🔕' : '✅';
+  btn.title         = data.active ? 'Inativar' : 'Ativar';
 }
 </script>
 {% endblock %}

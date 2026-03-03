@@ -9,9 +9,6 @@ class Church(db.Model):
     city       = db.Column(db.String(100), nullable=True)
     state      = db.Column(db.String(50),  nullable=True)
     active     = db.Column(db.Boolean, default=True)
-    app_icon     = db.Column(db.String(10),  nullable=True)   # Ex: ✝️
-    app_title    = db.Column(db.String(100), nullable=True)   # Ex: EBD
-    app_subtitle = db.Column(db.String(200), nullable=True)   # Ex: Sistema de Frequência
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     congregations = db.relationship('Congregation', backref='church', cascade='all, delete-orphan', lazy='dynamic')
