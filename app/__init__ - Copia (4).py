@@ -55,25 +55,6 @@ def create_app():
     from app import template_filters
     template_filters.register(app)
 
-    # ── Error handlers ──────────────────────────────────────────────────
-    @app.errorhandler(404)
-    def not_found(e):
-        from flask import render_template as rt
-        return rt('errors/404.html'), 404
-
-    @app.errorhandler(403)
-    def forbidden(e):
-        from flask import render_template as rt
-        return rt('errors/403.html'), 403
-
-    @app.errorhandler(500)
-    def internal_error(e):
-        from flask import render_template as rt
-        import traceback
-        detail = traceback.format_exc() if app.debug else None
-        db.session.rollback()
-        return rt('errors/500.html', error_detail=detail), 500
-
     @app.context_processor
     def inject_app_branding():
         """Injeta app_title e app_subtitle baseado na igreja do usuário logado."""

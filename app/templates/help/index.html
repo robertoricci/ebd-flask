@@ -1,0 +1,582 @@
+{% extends 'base.html' %}
+{% block title %}Manual do Sistema – EBD{% endblock %}
+{% block content %}
+
+<style>
+/* ── Layout ────────────────────────────────────────────────────────────── */
+.help-wrap       { display:grid; grid-template-columns:260px 1fr; gap:28px; align-items:start; }
+.help-sidebar    { position:sticky; top:20px; }
+.help-nav        { background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.help-nav-title  { padding:14px 18px; font-size:.7rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid var(--border); }
+.help-nav a      { display:flex; align-items:center; gap:10px; padding:10px 18px; font-size:.82rem; color:var(--muted); text-decoration:none; border-left:3px solid transparent; transition:.15s; }
+.help-nav a:hover{ background:var(--hover); color:var(--text); }
+.help-nav a.active{ background:var(--hover); color:var(--accent); border-left-color:var(--accent); font-weight:600; }
+.help-nav-sep    { padding:8px 18px 4px; font-size:.65rem; font-weight:700; color:var(--border); text-transform:uppercase; letter-spacing:.1em; margin-top:4px; }
+
+/* ── Conteúdo ──────────────────────────────────────────────────────────── */
+.help-section    { display:none; }
+.help-section.active { display:block; }
+
+.help-card       { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:28px 32px; margin-bottom:20px; }
+.help-card h2    { font-family:'Playfair Display',serif; font-size:1.5rem; margin-bottom:6px; color:var(--text); }
+.help-card h3    { font-size:1rem; font-weight:700; color:var(--accent); margin:24px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.help-card h4    { font-size:.875rem; font-weight:600; color:var(--text); margin:16px 0 6px; }
+.help-card p     { font-size:.875rem; color:var(--muted); line-height:1.7; margin-bottom:10px; }
+.help-card ul    { padding-left:18px; margin-bottom:12px; }
+.help-card li    { font-size:.875rem; color:var(--muted); line-height:1.8; }
+.help-card strong{ color:var(--text); }
+
+/* ── Badges de perfil ──────────────────────────────────────────────────── */
+.role-badge      { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:6px; font-size:.72rem; font-weight:700; margin:2px; }
+.role-super      { background:rgba(124,58,237,.2); color:#a78bfa; }
+.role-church     { background:rgba(139,92,246,.2); color:#8b5cf6; }
+.role-admin      { background:rgba(45,156,219,.2); color:#2d9cdb; }
+.role-teacher    { background:rgba(245,158,11,.2); color:#f59e0b; }
+.role-secretary  { background:rgba(236,72,153,.2); color:#ec4899; }
+
+/* ── Steps ─────────────────────────────────────────────────────────────── */
+.steps           { counter-reset:step; display:flex; flex-direction:column; gap:14px; margin:16px 0; }
+.step            { display:flex; gap:14px; align-items:flex-start; }
+.step-num        { counter-increment:step; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:.78rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+.step-body       { flex:1; }
+.step-body strong{ display:block; font-size:.875rem; color:var(--text); margin-bottom:2px; }
+.step-body p     { margin:0; font-size:.82rem; }
+
+/* ── Tip box ───────────────────────────────────────────────────────────── */
+.tip             { display:flex; gap:10px; background:rgba(45,156,219,.08); border:1px solid rgba(45,156,219,.25); border-radius:10px; padding:12px 16px; margin:14px 0; }
+.tip-icon        { font-size:1.1rem; flex-shrink:0; margin-top:1px; }
+.tip p           { margin:0; font-size:.82rem; color:var(--muted); }
+.warn            { background:rgba(245,158,11,.08); border-color:rgba(245,158,11,.3); }
+.warn p          { color:#d4a043; }
+
+/* ── Status pills ──────────────────────────────────────────────────────── */
+.status-pill     { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.72rem; font-weight:600; margin:1px; }
+.s-open          { background:rgba(45,156,219,.15); color:#2d9cdb; }
+.s-lib           { background:rgba(245,158,11,.15); color:#f59e0b; }
+.s-done          { background:rgba(16,185,129,.15); color:#10b981; }
+
+/* ── Tabela de permissões ──────────────────────────────────────────────── */
+.perm-table      { width:100%; border-collapse:collapse; font-size:.8rem; margin:12px 0; }
+.perm-table th   { padding:8px 12px; text-align:left; background:var(--hover); color:var(--muted); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; }
+.perm-table td   { padding:8px 12px; border-bottom:1px solid var(--border); color:var(--muted); }
+.perm-table td:first-child { color:var(--text); font-weight:500; }
+.perm-yes        { color:#10b981; font-weight:700; }
+.perm-no         { color:#4b5563; }
+.perm-partial    { color:#f59e0b; font-weight:600; }
+
+@media(max-width:900px) {
+  .help-wrap { grid-template-columns:1fr; }
+  .help-sidebar { position:static; }
+}
+</style>
+
+<div class="page-header">
+  <div>
+    <h2>📖 Manual do Sistema</h2>
+    <p>Guia completo de uso — EBD Sistema de Frequência</p>
+  </div>
+</div>
+
+<div class="help-wrap">
+
+  <!-- ── Sidebar nav ─────────────────────────────────────────────────── -->
+  <aside class="help-sidebar">
+    <div class="help-nav">
+      <div class="help-nav-title">Conteúdo</div>
+
+      <div class="help-nav-sep">Introdução</div>
+      <a href="#" onclick="show('visao-geral')" id="nav-visao-geral" class="active">🏠 Visão Geral</a>
+      <a href="#" onclick="show('perfis')"      id="nav-perfis">👥 Perfis de Acesso</a>
+
+      <div class="help-nav-sep">Administração</div>
+      <a href="#" onclick="show('igrejas')"      id="nav-igrejas">⛪ Igrejas e Congregações</a>
+      <a href="#" onclick="show('usuarios')"     id="nav-usuarios">🔑 Usuários</a>
+
+      <div class="help-nav-sep">Cadastros</div>
+      <a href="#" onclick="show('professores')"  id="nav-professores">👨‍🏫 Professores</a>
+      <a href="#" onclick="show('alunos')"       id="nav-alunos">🎓 Alunos</a>
+      <a href="#" onclick="show('turmas')"       id="nav-turmas">🏫 Turmas</a>
+
+      <div class="help-nav-sep">Aulas</div>
+      <a href="#" onclick="show('trimestres')"   id="nav-trimestres">📅 Trimestres</a>
+      <a href="#" onclick="show('licoes')"       id="nav-licoes">📝 Lições</a>
+
+      <div class="help-nav-sep">Presença</div>
+      <a href="#" onclick="show('presenca')"     id="nav-presenca">✅ Marcar Presença</a>
+
+      <div class="help-nav-sep">Relatórios</div>
+      <a href="#" onclick="show('relatorios')"   id="nav-relatorios">📊 Frequência</a>
+      <a href="#" onclick="show('aniversarios')" id="nav-aniversarios">🎂 Aniversários</a>
+      <a href="#" onclick="show('dashboard')"    id="nav-dashboard">📈 Dashboard</a>
+
+      <div class="help-nav-sep">Referência</div>
+      <a href="#" onclick="show('fluxo')"        id="nav-fluxo">🔄 Fluxo Completo</a>
+      <a href="#" onclick="show('faq')"          id="nav-faq">❓ Dúvidas Frequentes</a>
+    </div>
+  </aside>
+
+  <!-- ── Conteúdo principal ──────────────────────────────────────────── -->
+  <main>
+
+    <!-- ════════ VISÃO GERAL ════════ -->
+    <div class="help-section active" id="visao-geral">
+      <div class="help-card">
+        <h2>🏠 Visão Geral do Sistema</h2>
+        <p>O <strong>EBD – Sistema de Frequência</strong> é uma plataforma completa para gestão da Escola Bíblica Dominical. Permite controlar presença, cadastros, relatórios e aniversários de alunos e professores.</p>
+
+        <h3>O que você pode fazer</h3>
+        <ul>
+          <li><strong>Cadastrar</strong> alunos, professores e turmas organizados por congregação</li>
+          <li><strong>Criar aulas</strong> por trimestre e registrar presença de cada aluno</li>
+          <li><strong>Gerar relatórios</strong> de frequência em PDF com dados detalhados</li>
+          <li><strong>Acompanhar aniversários</strong> filtrados por mês com geração de PDF</li>
+          <li><strong>Visualizar dashboard</strong> com gráficos e indicadores em tempo real</li>
+          <li><strong>Gerenciar múltiplas igrejas e congregações</strong> de forma independente</li>
+        </ul>
+
+        <h3>Estrutura Hierárquica</h3>
+        <p>O sistema organiza os dados em 4 níveis:</p>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Igreja</strong><p>Entidade principal. Pode ter várias congregações.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Congregação</strong><p>Filial ou unidade da igreja. Possui suas próprias turmas.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Turma</strong><p>Grupo de alunos com um ou mais professores. Ex: Jovens, Adolescentes.</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Lição / Aula</strong><p>Registro de uma aula com data, presença, oferta e visitantes.</p></div></div>
+        </div>
+
+        <div class="tip">
+          <div class="tip-icon">💡</div>
+          <p>O nome exibido no menu lateral (ex: "EBD") pode ser personalizado por cada igreja em <strong>Igrejas → Editar → Nome no Sistema</strong>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ PERFIS ════════ -->
+    <div class="help-section" id="perfis">
+      <div class="help-card">
+        <h2>👥 Perfis de Acesso</h2>
+        <p>O sistema possui 5 perfis com diferentes níveis de permissão:</p>
+
+        <h3>Resumo dos Perfis</h3>
+        <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
+
+          <div style="background:var(--hover);border-radius:10px;padding:14px 18px;border-left:3px solid #a78bfa;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span class="role-badge role-super">SUPERADMIN</span>
+            </div>
+            <p style="margin:0;">Acesso total ao sistema. Gerencia todas as igrejas, congregações e usuários. Único que pode criar novas igrejas.</p>
+          </div>
+
+          <div style="background:var(--hover);border-radius:10px;padding:14px 18px;border-left:3px solid #8b5cf6;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span class="role-badge role-church">ADMIN DE IGREJA</span>
+            </div>
+            <p style="margin:0;">Gerencia todas as congregações de uma igreja. Pode criar usuários, turmas, aulas e ver relatórios de todas as congregações.</p>
+          </div>
+
+          <div style="background:var(--hover);border-radius:10px;padding:14px 18px;border-left:3px solid #2d9cdb;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span class="role-badge role-admin">ADMIN DE CONGREGAÇÃO</span>
+            </div>
+            <p style="margin:0;">Gerencia apenas a sua congregação. Cria turmas, aulas, alunos e professores. Vê relatórios somente da sua congregação.</p>
+          </div>
+
+          <div style="background:var(--hover);border-radius:10px;padding:14px 18px;border-left:3px solid #f59e0b;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span class="role-badge role-teacher">PROFESSOR</span>
+            </div>
+            <p style="margin:0;">Acessa apenas as aulas das turmas em que é professor. Pode marcar presença nas lições liberadas para sua turma.</p>
+          </div>
+
+          <div style="background:var(--hover);border-radius:10px;padding:14px 18px;border-left:3px solid #ec4899;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span class="role-badge role-secretary">SECRETÁRIO</span>
+            </div>
+            <p style="margin:0;">Acesso restrito a <strong>Aniversários</strong> e <strong>Marcar Presença</strong> — somente da turma vinculada ao seu cadastro.</p>
+          </div>
+        </div>
+
+        <h3>Tabela de Permissões</h3>
+        <table class="perm-table">
+          <thead>
+            <tr><th>Funcionalidade</th><th>SuperAdmin</th><th>Admin Igreja</th><th>Admin Cong.</th><th>Professor</th><th>Secretário</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Gerenciar Igrejas</td><td class="perm-yes">✔</td><td class="perm-no">—</td><td class="perm-no">—</td><td class="perm-no">—</td><td class="perm-no">—</td></tr>
+            <tr><td>Gerenciar Congregações</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-no">—</td><td class="perm-no">—</td><td class="perm-no">—</td></tr>
+            <tr><td>Gerenciar Usuários</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-no">—</td><td class="perm-no">—</td></tr>
+            <tr><td>Cadastrar Professores/Alunos</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-no">—</td><td class="perm-no">—</td></tr>
+            <tr><td>Gerenciar Turmas</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-no">—</td><td class="perm-no">—</td></tr>
+            <tr><td>Trimestres e Lições</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-no">—</td><td class="perm-no">—</td></tr>
+            <tr><td>Marcar Presença</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-partial">Suas turmas</td><td class="perm-partial">1 turma</td></tr>
+            <tr><td>Relatórios de Frequência</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-no">—</td><td class="perm-no">—</td></tr>
+            <tr><td>Dashboard</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-no">—</td></tr>
+            <tr><td>Aniversários</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-yes">✔</td><td class="perm-partial">Sua turma</td><td class="perm-partial">1 turma</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════ IGREJAS ════════ -->
+    <div class="help-section" id="igrejas">
+      <div class="help-card">
+        <h2>⛪ Igrejas e Congregações</h2>
+        <p>Somente o <span class="role-badge role-super">SUPERADMIN</span> acessa o menu <strong>Igrejas</strong>. Admins de Igreja gerenciam as congregações.</p>
+
+        <h3>Criar uma Igreja</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Acesse Igrejas no menu lateral</strong><p>Clique em "+ Nova Igreja".</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Preencha os dados básicos</strong><p>Nome (obrigatório), cidade e estado (UF).</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Personalize o nome no sistema</strong><p>Defina o ícone (emoji), título (ex: "EBD") e subtítulo que aparecem no menu lateral para todos os usuários desta igreja.</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Clique em "Criar Igreja"</strong><p>A igreja aparece na lista com status Ativa.</p></div></div>
+        </div>
+
+        <h3>Gerenciar Congregações</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Na lista de igrejas, clique em 🏘️</strong><p>Abre a tela de congregações da igreja.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Clique em "+ Nova Congregação"</strong><p>Informe o nome da congregação.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Associe usuários à congregação</strong><p>Vá em Usuários e vincule cada usuário à congregação correta.</p></div></div>
+        </div>
+
+        <div class="tip">
+          <div class="tip-icon">💡</div>
+          <p>O ícone emoji no menu lateral é definido por igreja. Use ✝️, 📖, ⛪ ou qualquer emoji que represente sua igreja.</p>
+        </div>
+
+        <h3>Ativar / Inativar Igreja</h3>
+        <p>Clique no botão 🔕 para inativar ou ✅ para reativar. Igrejas inativas não aparecem para seus usuários.</p>
+      </div>
+    </div>
+
+    <!-- ════════ USUÁRIOS ════════ -->
+    <div class="help-section" id="usuarios">
+      <div class="help-card">
+        <h2>🔑 Gerenciamento de Usuários</h2>
+        <p>Acesse em <strong>Cadastros → Usuários</strong>. Disponível para <span class="role-badge role-admin">ADMIN</span> e superiores.</p>
+
+        <h3>Criar um Usuário</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Clique em "+ Novo Usuário"</strong><p>O modal de criação abre.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Preencha nome, email e senha</strong><p>O email deve ser único no sistema.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Selecione o Perfil</strong><p>Escolha entre Admin de Congregação, Professor ou Secretário. SuperAdmin e Admin de Igreja só podem ser criados pelo SuperAdmin.</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Vincule à Congregação</strong><p>Selecione a congregação do usuário.</p></div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-body"><strong>Para Secretário: selecione a Turma</strong><p>O campo "Turma vinculada" aparece ao escolher o perfil Secretário. O secretário só terá acesso a essa turma.</p></div></div>
+        </div>
+
+        <div class="tip warn">
+          <div class="tip-icon">⚠️</div>
+          <p>O Secretário <strong>precisa ter uma turma vinculada</strong>, caso contrário não verá nenhum aluno na presença nem nos aniversários.</p>
+        </div>
+
+        <h3>Editar / Resetar Senha</h3>
+        <p>Clique em ✏️ na linha do usuário. Para trocar a senha, preencha o campo "Nova senha". Se deixar em branco, a senha não é alterada.</p>
+      </div>
+    </div>
+
+    <!-- ════════ PROFESSORES ════════ -->
+    <div class="help-section" id="professores">
+      <div class="help-card">
+        <h2>👨‍🏫 Professores</h2>
+        <p>Acesse em <strong>Cadastros → Professores</strong>. Disponível para <span class="role-badge role-admin">ADMIN</span> e superiores.</p>
+
+        <h3>Cadastrar Professor</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Clique em "+ Novo Professor"</strong><p>Preencha nome (obrigatório), email, telefone e data de nascimento.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Selecione a Congregação</strong><p>SuperAdmin e Admin de Igreja veem o campo de congregação. Admin de Congregação só cadastra na própria congregação.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Salve e vincule às Turmas</strong><p>Após criar, vá em Turmas e adicione o professor às turmas que ele leciona.</p></div></div>
+        </div>
+
+        <h3>Inativar Professor</h3>
+        <p>Se o professor possuir aulas registradas no histórico, ele <strong>não pode ser excluído</strong> — somente inativado. O sistema exibe um aviso automático no modal de exclusão e oferece o botão de inativar diretamente.</p>
+
+        <div class="tip">
+          <div class="tip-icon">💡</div>
+          <p>A <strong>data de nascimento</strong> é usada nos relatórios de aniversários. Preencha sempre que possível.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ ALUNOS ════════ -->
+    <div class="help-section" id="alunos">
+      <div class="help-card">
+        <h2>🎓 Alunos</h2>
+        <p>Acesse em <strong>Cadastros → Alunos</strong>. Disponível para <span class="role-badge role-admin">ADMIN</span> e superiores.</p>
+
+        <h3>Cadastrar Aluno</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Clique em "+ Novo Aluno"</strong><p>Preencha nome (obrigatório), email, telefone e data de nascimento.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Selecione a Congregação</strong><p>Conforme seu perfil, o campo pode ser fixo ou selecionável.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Matricule o aluno em uma Turma</strong><p>Vá em Turmas → editar → adicionar aluno à turma.</p></div></div>
+        </div>
+
+        <h3>Inativar Aluno</h3>
+        <p>Alunos com registros de presença não podem ser excluídos. Ao clicar em 🗑️, o sistema verifica automaticamente e oferece a opção de inativar. Alunos inativos não aparecem nas listas de presença.</p>
+
+        <h3>Buscar Alunos</h3>
+        <p>Use a barra de pesquisa no topo da listagem para filtrar por nome. A busca também mostra a congregação e a idade calculada automaticamente pela data de nascimento.</p>
+      </div>
+    </div>
+
+    <!-- ════════ TURMAS ════════ -->
+    <div class="help-section" id="turmas">
+      <div class="help-card">
+        <h2>🏫 Turmas</h2>
+        <p>Acesse em <strong>Cadastros → Turmas</strong>. As turmas organizam alunos e professores e são a base para as lições.</p>
+
+        <h3>Criar uma Turma</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Clique em "+ Nova Turma"</strong><p>Informe o nome (ex: Jovens, Adolescentes, Adultos) e opcionalmente uma descrição.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Selecione a Congregação</strong><p>Obrigatório para SuperAdmin e Admin de Igreja.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Adicione Professores e Alunos</strong><p>Após criar, edite a turma para vincular os membros.</p></div></div>
+        </div>
+
+        <div class="tip">
+          <div class="tip-icon">💡</div>
+          <p>Um aluno pode pertencer a <strong>mais de uma turma</strong>. Um professor também pode lecionar em várias turmas.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TRIMESTRES ════════ -->
+    <div class="help-section" id="trimestres">
+      <div class="help-card">
+        <h2>📅 Trimestres</h2>
+        <p>Acesse em <strong>Aulas → Trimestres</strong>. O trimestre agrupa as lições de um período (ex: 1º Trimestre 2025).</p>
+
+        <h3>Criar Trimestre e Gerar Aulas</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Clique em "+ Novo Trimestre"</strong><p>Informe o ano e o trimestre (1, 2, 3 ou 4).</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Clique em "Gerar Aulas"</strong><p>O sistema abre um modal listando as turmas que ainda não têm aulas neste trimestre.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Selecione as turmas desejadas</strong><p>Use "Selecionar todas" ou marque individualmente. Clique em "Gerar Aulas".</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><strong>As lições são criadas automaticamente</strong><p>13 lições numeradas são geradas para cada turma selecionada.</p></div></div>
+        </div>
+
+        <div class="tip warn">
+          <div class="tip-icon">⚠️</div>
+          <p>O botão <strong>Gerar Aulas</strong> só aparece para turmas que ainda <strong>não possuem lições</strong> neste trimestre.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ LIÇÕES ════════ -->
+    <div class="help-section" id="licoes">
+      <div class="help-card">
+        <h2>📝 Lições</h2>
+        <p>Acesse em <strong>Aulas → Lições</strong>. Cada lição representa uma aula com data, alunos e registros.</p>
+
+        <h3>Status das Lições</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">
+          <div style="background:var(--hover);border-radius:8px;padding:10px 16px;flex:1;min-width:140px;">
+            <span class="status-pill s-open">ABERTO</span>
+            <p style="margin:8px 0 0;font-size:.8rem;">Lição criada, ainda não liberada para marcar presença.</p>
+          </div>
+          <div style="background:var(--hover);border-radius:8px;padding:10px 16px;flex:1;min-width:140px;">
+            <span class="status-pill s-lib">LIBERADO</span>
+            <p style="margin:8px 0 0;font-size:.8rem;">Professores podem registrar presença. Lição ativa.</p>
+          </div>
+          <div style="background:var(--hover);border-radius:8px;padding:10px 16px;flex:1;min-width:140px;">
+            <span class="status-pill s-done">FINALIZADO</span>
+            <p style="margin:8px 0 0;font-size:.8rem;">Encerrada. Dados contabilizados nos relatórios.</p>
+          </div>
+        </div>
+
+        <h3>Fluxo de uma Lição</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Lição criada (ABERTO)</strong><p>O admin preenche título, data, oferta, bíblias e revistas.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Admin libera a lição (LIBERADO)</strong><p>Clique em "Liberar" para permitir que professores marquem presença.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Professor marca presença</strong><p>Acessa "Marcar Presença", seleciona a lição liberada e registra.</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Admin finaliza (FINALIZADO)</strong><p>Lição encerrada. Os dados entram nos relatórios.</p></div></div>
+        </div>
+
+        <div class="tip">
+          <div class="tip-icon">💡</div>
+          <p>Apenas lições com status <span class="status-pill s-done">FINALIZADO</span> aparecem nos <strong>Relatórios de Frequência</strong>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ PRESENÇA ════════ -->
+    <div class="help-section" id="presenca">
+      <div class="help-card">
+        <h2>✅ Marcar Presença</h2>
+        <p>Acesse em <strong>Presença → Marcar Presença</strong>. Disponível para todos os perfis (com filtro por turma para Professor e Secretário).</p>
+
+        <h3>Como Registrar Presença</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Selecione a Lição</strong><p>O dropdown mostra apenas lições com status <span class="status-pill s-lib">LIBERADO</span> da(s) sua(s) turma(s).</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Marque os alunos presentes</strong><p>Use os toggles individuais ou "Marcar Todos" / "Desmarcar Todos".</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Registre visitantes</strong><p>Clique em "+ Adicionar Visitante" para registrar nome, telefone e igreja de origem.</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Salve</strong><p>A presença é salva automaticamente a cada alteração de toggle.</p></div></div>
+        </div>
+
+        <div class="tip warn">
+          <div class="tip-icon">⚠️</div>
+          <p>Se não aparecer nenhuma lição no dropdown, verifique se o admin já <strong>liberou</strong> a lição para sua turma.</p>
+        </div>
+
+        <h3>Secretário</h3>
+        <p>O Secretário vê apenas as lições da turma que foi vinculada ao seu cadastro de usuário. Se não houver turma vinculada, o dropdown aparece vazio — contate o administrador.</p>
+      </div>
+    </div>
+
+    <!-- ════════ RELATÓRIOS ════════ -->
+    <div class="help-section" id="relatorios">
+      <div class="help-card">
+        <h2>📊 Relatórios de Frequência</h2>
+        <p>Acesse em <strong>Relatórios → Frequência</strong>. Disponível para <span class="role-badge role-admin">ADMIN</span> e superiores.</p>
+
+        <h3>Como Gerar um Relatório</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Selecione os filtros</strong><p>Ano → Trimestre → Congregação → <strong>Lição</strong> (obrigatório) → Turma.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Os dados aparecem automaticamente</strong><p>Cards de resumo, barras de progresso por turma e tabela detalhada.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Clique em "Gerar PDF"</strong><p>O relatório é exportado com todos os dados da seleção atual.</p></div></div>
+        </div>
+
+        <h4>O que o PDF contém</h4>
+        <ul>
+          <li>Identificação: Igreja, Congregação, Ano, Trimestre, Lição</li>
+          <li>Resumo geral: Matriculados, Presentes, Ausentes, Visitantes, Oferta, Frequência</li>
+          <li>Detalhamento por turma com frequência percentual colorida</li>
+          <li>Lista completa de visitantes (quando lição selecionada)</li>
+        </ul>
+
+        <h3>Aba Aniversariantes</h3>
+        <p>Clique na aba <strong>🎂 Aniversariantes</strong> na tela de Relatórios para acessar a listagem com filtro de mês e geração de PDF — idêntico ao menu Aniversários, mas dentro dos relatórios.</p>
+
+        <h3>Relatório de Membros</h3>
+        <p>Clique em <strong>"📋 Relatório de Membros"</strong> no cabeçalho para gerar um PDF com todos os alunos por turma, professores e usuários do sistema.</p>
+      </div>
+    </div>
+
+    <!-- ════════ ANIVERSÁRIOS ════════ -->
+    <div class="help-section" id="aniversarios">
+      <div class="help-card">
+        <h2>🎂 Aniversários</h2>
+        <p>Acesse em <strong>Relatórios → Aniversários</strong> (ou menu Secretário). Mostra aniversariantes filtrados por mês.</p>
+
+        <h3>Filtros disponíveis</h3>
+        <ul>
+          <li><strong>Todos os meses</strong> — exibe todos com separador por mês</li>
+          <li><strong>Mês específico</strong> — filtra somente o mês selecionado</li>
+        </ul>
+
+        <h3>Escopo por perfil</h3>
+        <ul>
+          <li><span class="role-badge role-super">SUPERADMIN</span> / <span class="role-badge role-church">ADMIN IGREJA</span> → todos alunos e professores de todas as congregações</li>
+          <li><span class="role-badge role-admin">ADMIN CONG.</span> → alunos e professores da sua congregação</li>
+          <li><span class="role-badge role-teacher">PROFESSOR</span> / <span class="role-badge role-secretary">SECRETÁRIO</span> → somente alunos da turma vinculada</li>
+        </ul>
+
+        <h3>Gerar PDF</h3>
+        <p>Clique em <strong>"Gerar PDF"</strong>. O PDF gerado contém: Nome da Igreja, Congregação, Nome do aluno/professor, Data de aniversário, Idade, Tipo, Turma, Telefone e Email.</p>
+
+        <div class="tip">
+          <div class="tip-icon">🎉</div>
+          <p>Aniversariantes <strong>do dia atual</strong> são destacados com o emoji 🎉 tanto na tabela quanto no Dashboard.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ DASHBOARD ════════ -->
+    <div class="help-section" id="dashboard">
+      <div class="help-card">
+        <h2>📈 Dashboard</h2>
+        <p>Acesse em <strong>Principal → Dashboard</strong>. Disponível para todos exceto Secretário.</p>
+
+        <h3>O que você vê</h3>
+        <ul>
+          <li><strong>Cards de cadastro</strong> — total de alunos, professores e turmas</li>
+          <li><strong>Cards de frequência</strong> — matriculados, presentes, ausentes, visitantes, oferta, bíblias, revistas e frequência percentual</li>
+          <li><strong>Gráfico de linha</strong> — evolução da frequência por lição ao longo do tempo</li>
+          <li><strong>Aulas de hoje</strong> — lições com data igual ao dia atual</li>
+          <li><strong>Aniversariantes</strong> — card com filtro "Este mês" ou "Todos", contagem e botão PDF</li>
+        </ul>
+
+        <h3>Filtros do Dashboard</h3>
+        <p>Use os filtros de Ano, Trimestre, Congregação, Lição e Turma para segmentar os dados exibidos. SuperAdmin e Admin de Igreja podem filtrar por congregação.</p>
+      </div>
+    </div>
+
+    <!-- ════════ FLUXO COMPLETO ════════ -->
+    <div class="help-section" id="fluxo">
+      <div class="help-card">
+        <h2>🔄 Fluxo Completo do Sistema</h2>
+        <p>Siga esta sequência para configurar o sistema do zero:</p>
+
+        <h3>Configuração Inicial (feita pelo SuperAdmin)</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Criar a Igreja</strong><p>Menu Igrejas → + Nova Igreja. Preencha nome e personalize o título do sistema.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Criar Congregações</strong><p>Na lista de igrejas, clique 🏘️ → + Nova Congregação.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Criar usuário Admin de Igreja</strong><p>Menu Usuários → perfil "Admin de Igreja" → vincule à igreja.</p></div></div>
+        </div>
+
+        <h3>Operação Regular (Admin de Congregação)</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Cadastre Professores e Alunos</strong><p>Cadastros → Professores / Alunos.</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Crie as Turmas e vincule membros</strong><p>Cadastros → Turmas → adicione professores e alunos.</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Crie o Trimestre e gere as Lições</strong><p>Aulas → Trimestres → Gerar Aulas → selecione turmas.</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Libere as Lições no dia da aula</strong><p>Aulas → Lições → clique "Liberar" na lição do dia.</p></div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-body"><strong>Professor marca presença</strong><p>Presença → Marcar Presença → seleciona lição → toggle por aluno.</p></div></div>
+          <div class="step"><div class="step-num">6</div><div class="step-body"><strong>Admin finaliza a Lição</strong><p>Aulas → Lições → clique "Finalizar".</p></div></div>
+          <div class="step"><div class="step-num">7</div><div class="step-body"><strong>Consulte os Relatórios</strong><p>Relatórios → selecione a lição finalizada → Gerar PDF.</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ FAQ ════════ -->
+    <div class="help-section" id="faq">
+      <div class="help-card">
+        <h2>❓ Dúvidas Frequentes</h2>
+
+        <h3>Por que não aparecem lições para marcar presença?</h3>
+        <p>A lição precisa estar com status <span class="status-pill s-lib">LIBERADO</span>. Peça ao administrador para liberar a lição. Professores e Secretários só veem as lições das suas turmas.</p>
+
+        <h3>Por que não aparecem dados no relatório?</h3>
+        <p>O relatório exige que você selecione uma <strong>Lição</strong> no filtro. Além disso, somente lições com status <span class="status-pill s-done">FINALIZADO</span> aparecem na lista.</p>
+
+        <h3>Como excluir um aluno/professor que tem histórico?</h3>
+        <p>Alunos e professores com presença registrada não podem ser excluídos. Ao clicar em 🗑️, o sistema detecta automaticamente e oferece a opção de <strong>Inativar</strong>, que remove da listagem ativa sem apagar o histórico.</p>
+
+        <h3>O Secretário não vê nenhum aluno na presença</h3>
+        <p>O Secretário precisa ter uma <strong>turma vinculada</strong> no seu cadastro de usuário. Vá em Usuários → editar o usuário secretário → selecione a turma no campo "Turma vinculada".</p>
+
+        <h3>Como personalizar o nome que aparece no menu lateral?</h3>
+        <p>Acesse <strong>Igrejas → ✏️ Editar</strong> a igreja. Na seção "Nome no Sistema" defina o ícone (emoji), o título e o subtítulo. A pré-visualização atualiza em tempo real.</p>
+
+        <h3>Por que o botão "Gerar Aulas" não aparece?</h3>
+        <p>O botão aparece apenas para turmas que <strong>ainda não possuem lições</strong> naquele trimestre. Se todas as turmas já têm lições, o botão não é exibido.</p>
+
+        <h3>Como ver aniversariantes de outros meses?</h3>
+        <p>Na tela de <strong>Aniversários</strong>, selecione "Todos os meses" no filtro. Os aniversariantes são agrupados por mês com separadores visuais.</p>
+
+        <h3>Posso ter um aluno em mais de uma turma?</h3>
+        <p>Sim. Um aluno pode ser matriculado em quantas turmas quiser. No relatório de aniversários, todas as turmas em que está matriculado aparecem na coluna "Turma".</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function show(id) {
+  // Esconde todas as seções
+  document.querySelectorAll('.help-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.help-nav a').forEach(a => a.classList.remove('active'));
+
+  // Mostra a seção selecionada
+  const section = document.getElementById(id);
+  const navLink = document.getElementById('nav-' + id);
+  if (section) section.classList.add('active');
+  if (navLink) navLink.classList.add('active');
+
+  // Scroll para o topo do conteúdo
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  return false;
+}
+
+// Ativa seção pelo hash da URL
+const hash = window.location.hash.replace('#', '');
+if (hash) show(hash);
+</script>
+{% endblock %}

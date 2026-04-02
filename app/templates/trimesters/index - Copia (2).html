@@ -31,16 +31,10 @@
             </div>
           </td>
           <td style="display:flex;gap:6px;align-items:center;">
-            {# Botão Gerar: desabilitado se já tem aulas #}
-            {% if info.total > 0 %}
-            <button class="btn btn-secondary btn-sm" disabled title="Já existem aulas geradas para esta congregação"
-              style="opacity:.45;cursor:not-allowed;">⚡ Gerar</button>
-            {% else %}
             <button class="btn btn-success btn-sm"
               onclick="openGenerate({{ t.id }}, '{{ t.name | e }}')">
               ⚡ Gerar
             </button>
-            {% endif %}
 
             <button class="btn btn-secondary btn-sm"
               onclick="openEdit({{ t.id }}, '{{ t.name | e }}', {{ t.year }}, {{ t.quarter }}, '{{ t.start_date }}', '{{ t.end_date }}', '{{ t.weekdays }}', '{{ t.lesson_prefix | e }}')">✏️</button>
@@ -171,8 +165,8 @@
             <option value="3">3º</option><option value="4">4º</option>
           </select>
         </div>
-        <div class="form-group"><label>Início *</label><input type="date" name="start_date" id="cStart" required onchange="autoEndDate('cStart','cEnd')"></div>
-        <div class="form-group"><label>Fim <span style="font-size:.7rem;color:var(--muted);">preenchido automaticamente</span></label><input type="date" name="end_date" id="cEnd"></div>
+        <div class="form-group"><label>Início *</label><input type="date" name="start_date" required></div>
+        <div class="form-group"><label>Fim *</label><input type="date" name="end_date" required></div>
       </div>
       <div class="form-group">
         <label>Dias da Semana</label>
@@ -206,7 +200,7 @@
             <option value="3">3º</option><option value="4">4º</option>
           </select>
         </div>
-        <div class="form-group"><label>Início *</label><input type="date" name="start_date" id="eStart" onchange="autoEndDate('eStart','eEnd')"></div>
+        <div class="form-group"><label>Início *</label><input type="date" name="start_date" id="eStart"></div>
         <div class="form-group"><label>Fim *</label><input type="date" name="end_date" id="eEnd"></div>
       </div>
       <div class="form-group">
@@ -293,20 +287,6 @@ function updateGenCount() {
   document.getElementById('genSelCount').textContent = `${checked} de ${total} turma(s) selecionada(s)`;
   document.getElementById('genSubmitBtn').disabled = checked === 0;
   document.getElementById('genSubmitBtn').style.opacity = checked === 0 ? '.45' : '1';
-}
-
-function autoEndDate(startId, endId) {
-  const startVal = document.getElementById(startId).value;
-  const endEl    = document.getElementById(endId);
-  if (!startVal || endEl.value) return;
-  // Parseamos manualmente para evitar bug de timezone do JS
-  const [y, m, d] = startVal.split('-').map(Number);
-  // Soma 91 dias (13 semanas) usando Date local, não UTC
-  const end = new Date(y, m - 1, d + 91);
-  const yy  = end.getFullYear();
-  const mm  = String(end.getMonth() + 1).padStart(2, '0');
-  const dd  = String(end.getDate()).padStart(2, '0');
-  endEl.value = `${yy}-${mm}-${dd}`;
 }
 
 function openDelete(id, name, count) {

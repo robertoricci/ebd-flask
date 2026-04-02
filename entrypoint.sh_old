@@ -5,10 +5,11 @@ set -e
 reset_alembic() {
     echo "    Resetando alembic_version no banco..."
     python3 - << 'PYEOF'
-import psycopg, os
-conn = psycopg.connect(os.environ['DATABASE_URL'])
+import psycopg2, os
+conn = psycopg2.connect(os.environ['DATABASE_URL'])
 conn.autocommit = True
-conn.execute('DROP TABLE IF EXISTS alembic_version;')
+cur = conn.cursor()
+cur.execute('DROP TABLE IF EXISTS alembic_version;')
 conn.close()
 print("    alembic_version removida com sucesso.")
 PYEOF
@@ -17,12 +18,11 @@ PYEOF
 # ── 1. Aguarda PostgreSQL ficar pronto ───────────────────────────────────────
 echo "==> Aguardando PostgreSQL..."
 python3 - << 'PYEOF'
-import time, os
+import time, psycopg2, os
 url = os.environ['DATABASE_URL']
 for i in range(30):
     try:
-        import psycopg
-        psycopg.connect(url).close()
+        psycopg2.connect(url)
         print("    PostgreSQL pronto!")
         break
     except Exception as e:
